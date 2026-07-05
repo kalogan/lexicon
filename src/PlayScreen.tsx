@@ -15,6 +15,7 @@ import {
 } from "./board.js";
 import { loadDictionary, readyDictionary, type Dictionary } from "./dictionary.js";
 import { sound } from "./sound.js";
+import { music } from "./music.js";
 
 export interface FoundWord {
   word: string;
@@ -83,6 +84,11 @@ export function PlayScreen({
     if (!dict) loadDictionary().then(setDict);
   }, [dict]);
 
+  useEffect(() => {
+    music.start();
+    return () => music.stop();
+  }, []);
+
   // Countdown — paused while the menu is open or the dictionary is still loading.
   useEffect(() => {
     if (!timed || !running) return;
@@ -145,6 +151,7 @@ export function PlayScreen({
   const toggleMute = () => {
     const m = !muted;
     sound.setMuted(m);
+    music.setMuted(m);
     setMuted(m);
     if (!m) sound.tap();
   };

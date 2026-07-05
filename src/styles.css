@@ -560,3 +560,105 @@ body,
   .rcard.pick { max-width: none; flex-direction: row; align-items: baseline; gap: 8px; }
   .rcard.pick .r-tag { margin-left: auto; }
 }
+
+/* "Your relics" label + trigger glow (the word→relic connection = juice) */
+.deck-wrap {
+  width: min(92vw, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.deck-label {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lex-muted);
+  font-weight: 700;
+}
+.rcard.flash {
+  animation: relic-flash 0.7s ease;
+}
+@keyframes relic-flash {
+  0% { transform: translateY(0) scale(1); }
+  30% {
+    transform: translateY(-6px) scale(1.07);
+    box-shadow: 0 0 0 2px var(--lex-accent), 0 10px 22px rgba(217, 138, 61, 0.5);
+  }
+  100% { transform: none; }
+}
+.score-fly {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  color: var(--lex-accent-deep);
+  font-weight: 800;
+  font-size: 26px;
+  pointer-events: none;
+  animation: score-fly 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+@keyframes score-fly {
+  0% { opacity: 0; transform: translate(-50%, 8px) scale(0.8); }
+  20% { opacity: 1; transform: translate(-50%, -4px) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -40px) scale(1); }
+}
+.draft-sub {
+  text-align: center;
+  color: var(--lex-muted);
+  font-size: 12px;
+  margin-top: 12px;
+  letter-spacing: 0.03em;
+}
+
+/* ── Classic setup ───────────────────────────────────────────────────────── */
+.setup {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.setup-card {
+  width: min(92vw, 380px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  padding: 28px 24px;
+  box-shadow: 0 24px 70px rgba(43, 36, 64, 0.22);
+}
+.setup-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.setup-label {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lex-muted);
+  font-weight: 700;
+}
+.pill-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pill {
+  flex: 1 1 auto;
+  appearance: none;
+  border: 1px solid rgba(43, 36, 64, 0.16);
+  background: #fbf7ee;
+  color: var(--lex-ink);
+  border-radius: 999px;
+  padding: 9px 16px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pill.on {
+  background: var(--lex-accent);
+  color: #2b1c0c;
+  border-color: transparent;
+}

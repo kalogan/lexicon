@@ -11,9 +11,10 @@ import { readyDictionary, loadDictionary, type Dictionary } from "./dictionary.j
 import { scoreWord, makeRunState, type RunState, type Card, type Breakdown } from "./run/engine.js";
 import { STARTER_DECK, TUTORIAL_DECK, DRAFT_POOL } from "./run/cards.js";
 import { sound } from "./sound.js";
+import { music } from "./music.js";
 
-const SIZE = 4;
-const TIME_BUDGET = 75;
+const SIZE = 5;
+const TIME_BUDGET = 90;
 const targetFor = (board: number) => Math.round(100 * Math.pow(1.7, board - 1));
 
 function cellAt(x: number, y: number): number {
@@ -67,9 +68,15 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const [timeLeft, setTimeLeft] = useState(TIME_BUDGET);
   const [path, setPath] = useState<number[]>([]);
   const [found, setFound] = useState<Set<string>>(() => new Set());
-  const [phase, setPhase] = useState<"play" | "draft" | "dead">("play");
-  const [draft, setDraft] = useState<Card[]>([]);
+  // A real run opens with a 3-way choice; the first-ever run skips it (tutorial deck).
+  const [phase, setPhase] = useState<"opening" | "play" | "draft" | "dead">(() =>
+    firstRun.current ? "play" : "opening",
+  );
+  const [draft, setDraft] = useState<Card[]>(() => (firstRun.current ? [] : pick3(STARTER_DECK)));
   const [toast, setToast] = useState<Breakdown | null>(null);
+  // Relic names that lit up on the last word (for the trigger-glow) + a score-fly.
+  const [flash, setFlash] = useState<Set<string>>(() => new Set());
+  const [fly, setFly] = useState<{ id: number; total: number } | null>(null);
   const tracing = useRef(false);
   const target = targetFor(boardIdx);
   const ready = dict !== null;
@@ -78,6 +85,12 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   useEffect(() => {
     if (!dict) loadDictionary().then(setDict);
   }, [dict]);
+
+  // Ambient bed for the run; stops when we leave.
+  useEffect(() => {
+    music.start();
+    return () => music.stop();
+  }, []);
 
   // The time economy: tick down while playing; hit 0 → board ends.
   useEffect(() => {
@@ -128,7 +141,16 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setRun((r) => commit(r, b));
     setToast(b);
     window.setTimeout(() => setToast((t) => (t === b ? null : t)), 1400);
+    // Juice: glow the relics that fired + fly the score up.
+    setFlash(new Set(b.triggers.map((t) => t.card)));
+    window.setTimeout(() => setFlash(new Set()), 720);
+    setFly({ id: Date.now(), total: b.total });
     sound.found(Math.min(11, Math.round(b.total / 40) + 1));
+  };
+
+  const openingPick = (card: Card) => {
+    setDeck((d) => [...d, card]);
+    setPhase("play");
   };
 
   const nextBoard = (card: Card) => {
@@ -157,6 +179,11 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
         <div className="stat">
           <span className="stat-num" key={boardScore}>{boardScore}</span>
           <span className="stat-label">board {boardIdx}</span>
+          {fly && (
+            <span key={fly.id} className="score-fly">
+              +{fly.total}
+            </span>
+          )}
         </div>
         <div className={`stat timer${running && timeLeft <= 10 ? " low" : ""}`}>
           <span className="stat-num">{Math.max(0, timeLeft)}s</span>
@@ -172,14 +199,21 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
         <div className="target-fill" style={{ width: `${pct}%` }} />
       </div>
 
-      {/* Active engine */}
-      <div className="deck">
-        {deck.map((c, i) => (
-          <div key={c.id + i} className={`rcard r-${c.rarity} k-${c.kind}`} title={c.text}>
-            <b>{c.name}</b>
-            <span>{c.text}</span>
-          </div>
-        ))}
+      {/* Your relics — the engine you're building. They glow when they fire. */}
+      <div className="deck-wrap">
+        <span className="deck-label">◈ your relics · {deck.length}</span>
+        <div className="deck">
+          {deck.map((c, i) => (
+            <div
+              key={c.id + i}
+              className={`rcard r-${c.rarity} k-${c.kind}${flash.has(c.name) ? " flash" : ""}`}
+              title={c.text}
+            >
+              <b>{c.name}</b>
+              <span>{c.text}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Live breakdown / toast */}
@@ -236,19 +270,26 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
 
       {!ready && <div className="loading-veil">gathering the dictionary…</div>}
 
-      {phase === "draft" && (
+      {(phase === "draft" || phase === "opening") && (
         <div className="menu-veil">
           <div className="draft-card">
-            <div className="menu-title">Draft a Dictionary</div>
+            <div className="menu-title">{phase === "opening" ? "Choose your opening relic" : "Draft a relic"}</div>
             <div className="draft-row">
               {draft.map((c) => (
-                <button key={c.id} className={`rcard pick r-${c.rarity} k-${c.kind}`} onClick={() => nextBoard(c)}>
+                <button
+                  key={c.id}
+                  className={`rcard pick r-${c.rarity} k-${c.kind}`}
+                  onClick={() => (phase === "opening" ? openingPick(c) : nextBoard(c))}
+                >
                   <b>{c.name}</b>
                   <span>{c.text}</span>
                   <em className="r-tag">{c.rarity}</em>
                 </button>
               ))}
             </div>
+            {phase === "opening" && (
+              <div className="draft-sub">a fresh run — you'll draft the rest between boards</div>
+            )}
           </div>
         </div>
       )}

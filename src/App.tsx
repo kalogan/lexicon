@@ -10,16 +10,19 @@ import type { MenuOption } from "game-kit/title";
 import { PlayScreen, type RoundResult } from "./PlayScreen.js";
 import { ResultsScreen } from "./ResultsScreen.js";
 import { RunScreen } from "./RunScreen.js";
+import { ClassicSetup } from "./ClassicSetup.js";
 import { loadDictionary } from "./dictionary.js";
-import { MODES, type Mode } from "./modes.js";
+import { type Mode } from "./modes.js";
 import { sound } from "./sound.js";
 import * as store from "./store.js";
 
-type Phase = "gate" | "ident" | "title" | "play" | "results" | "run";
+type Phase = "gate" | "ident" | "title" | "play" | "results" | "run" | "classic";
+
+const DEFAULT_MODE: Mode = { id: "classic-4-180", label: "Classic", size: 4, durationSec: 180, blurb: "" };
 
 export function App() {
   const [phase, setPhase] = useState<Phase>("gate");
-  const [mode, setMode] = useState<Mode>(MODES[0]!);
+  const [mode, setMode] = useState<Mode>(DEFAULT_MODE);
   const [seed, setSeed] = useState(() => Date.now());
   const [result, setResult] = useState<RoundResult | null>(null);
   const [best, setBest] = useState(0);
@@ -70,8 +73,8 @@ export function App() {
 
   if (phase === "title") {
     const options: MenuOption[] = [
-      { label: "Runs · roguelike (beta)", primary: true, onSelect: () => setPhase("run") },
-      ...MODES.map((m) => ({ label: `Classic · ${m.label} · ${m.blurb}`, onSelect: () => startRound(m) })),
+      { label: "Roguelike", primary: true, onSelect: () => setPhase("run") },
+      { label: "Classic", onSelect: () => setPhase("classic") },
     ];
     return (
       <TitleScreen
@@ -85,6 +88,17 @@ export function App() {
 
   if (phase === "run") {
     return <RunScreen onExit={() => setPhase("title")} />;
+  }
+
+  if (phase === "classic") {
+    return (
+      <ClassicSetup
+        onStart={(size, durationSec) =>
+          startRound({ id: `classic-${size}-${durationSec}`, label: `Classic ${size}×${size}`, size, durationSec, blurb: "" })
+        }
+        onExit={() => setPhase("title")}
+      />
+    );
   }
 
   if (phase === "play") {
