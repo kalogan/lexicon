@@ -8,6 +8,7 @@
  * the time-granters to see their seconds. The draft/arrange UI will expose that.
  */
 import type { Card } from "./engine.js";
+import { EXTRA_CARDS } from "./cards-extra.js";
 
 // ── Dictionaries (persistent) ────────────────────────────────────────────────
 
@@ -146,8 +147,21 @@ export const ALL_CARDS: readonly Card[] = [
   TINY, SCHOLAR, RARE_LETTER, PREFIX, SUFFIX, ALPHABET, TIME_DICT, TIME_BROKER, CHRONOLOGIST,
 ];
 
-/** A gentle starting deck; everything else is drafted 1-of-3 between boards. */
-export const STARTER_DECK: readonly Card[] = [ALPHABET];
+/** A gentle starting deck for REAL runs; everything else is drafted 1-of-3. */
+export const STARTER_DECK: readonly Card[] = [ALPHABET, TINY];
 
-/** The draftable pool (everything not in the starter deck). */
-export const DRAFT_POOL: readonly Card[] = ALL_CARDS.filter((c) => c.id !== "alphabet");
+/**
+ * The FIRST-RUN tutorial deck: a pre-stacked, deliberately "broken" engine so a
+ * new player feels the snowball on board one (find a long word → it restores
+ * time → Time Broker turns that time into chips → Chronologist banks permanent
+ * mult → the next word is worth more). Order matters: time-granters BEFORE Time
+ * Broker. Real runs start from STARTER_DECK and earn their engine by drafting.
+ */
+export const TUTORIAL_DECK: readonly Card[] = [ALPHABET, SCHOLAR, TIME_DICT, CHRONOLOGIST, TIME_BROKER];
+
+/** The draftable pool: the example dictionaries (minus the starters) + the
+ *  expanded set (cards-extra) spanning the archetypes. */
+export const DRAFT_POOL: readonly Card[] = [
+  ...ALL_CARDS.filter((c) => c.id !== "alphabet" && c.id !== "tiny"),
+  ...EXTRA_CARDS,
+];

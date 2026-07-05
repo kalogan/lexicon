@@ -9,12 +9,13 @@ import { StartGate, StudioIdent, TitleScreen } from "game-kit/title/r3f";
 import type { MenuOption } from "game-kit/title";
 import { PlayScreen, type RoundResult } from "./PlayScreen.js";
 import { ResultsScreen } from "./ResultsScreen.js";
+import { RunScreen } from "./RunScreen.js";
 import { loadDictionary } from "./dictionary.js";
 import { MODES, type Mode } from "./modes.js";
 import { sound } from "./sound.js";
 import * as store from "./store.js";
 
-type Phase = "gate" | "ident" | "title" | "play" | "results";
+type Phase = "gate" | "ident" | "title" | "play" | "results" | "run";
 
 export function App() {
   const [phase, setPhase] = useState<Phase>("gate");
@@ -68,19 +69,22 @@ export function App() {
   }
 
   if (phase === "title") {
-    const options: MenuOption[] = MODES.map((m) => ({
-      label: `${m.label} · ${m.blurb}`,
-      primary: m.id === "standard",
-      onSelect: () => startRound(m),
-    }));
+    const options: MenuOption[] = [
+      { label: "Runs · roguelike (beta)", primary: true, onSelect: () => setPhase("run") },
+      ...MODES.map((m) => ({ label: `Classic · ${m.label} · ${m.blurb}`, onSelect: () => startRound(m) })),
+    ];
     return (
       <TitleScreen
         title="LEXICON"
-        subtitle="Trace the hidden words. Beat your last game."
+        subtitle="Build impossible vocabulary engines."
         titleColor="#2b2440"
         options={options}
       />
     );
+  }
+
+  if (phase === "run") {
+    return <RunScreen onExit={() => setPhase("title")} />;
   }
 
   if (phase === "play") {
