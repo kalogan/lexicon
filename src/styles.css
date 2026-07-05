@@ -664,11 +664,13 @@ body,
 }
 
 /* ── Economy (coins + shop) ──────────────────────────────────────────────── */
+.run-header {
+  width: min(92vw, 420px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 .coins {
-  position: absolute;
-  top: calc(12px + env(safe-area-inset-top, 0px));
-  right: 12px;
-  z-index: 5;
   background: rgba(255, 255, 255, 0.72);
   border-radius: 999px;
   padding: 6px 13px;
@@ -677,6 +679,67 @@ body,
   color: var(--lex-accent-deep);
   box-shadow: 0 2px 6px rgba(43, 36, 64, 0.12);
   animation: score-pop 0.28s ease;
+}
+
+/* Boss board banner */
+.boss-banner {
+  width: min(92vw, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: linear-gradient(90deg, rgba(208, 86, 63, 0.16), rgba(208, 86, 63, 0.06));
+  border: 1px solid rgba(208, 86, 63, 0.4);
+  animation: pop-in 0.35s ease;
+}
+.boss-name {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--lex-bad);
+  font-size: 14px;
+}
+.boss-blurb {
+  font-size: 12px;
+  color: var(--lex-ink);
+}
+/* Sealed tiles on a boss board */
+.tile.blocked {
+  background: repeating-linear-gradient(45deg, #4a4258, #4a4258 6px, #3d3648 6px, #3d3648 12px);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+  animation: none;
+  cursor: default;
+}
+
+/* The shop — a distinct "vault" panel so it doesn't read like the draft */
+.shop-card {
+  width: min(94vw, 560px);
+  background: linear-gradient(180deg, #2b2440 0%, #241d38 100%);
+  color: #f4efe4;
+  border-radius: 22px;
+  padding: 22px 20px;
+  box-shadow: 0 24px 70px rgba(20, 14, 30, 0.5);
+  border: 1px solid rgba(217, 138, 61, 0.3);
+}
+.shop-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.shop-title {
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--lex-accent);
+  font-size: 16px;
+}
+.shop-coins {
+  font-weight: 800;
+  color: #fbf7ee;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 14px;
 }
 .shop-actions {
   display: flex;

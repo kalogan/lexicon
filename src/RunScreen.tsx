@@ -10,8 +10,18 @@ import { makeBoard, canExtend, pathWord, MIN_WORD_LEN, type Board } from "./boar
 import { readyDictionary, loadDictionary, type Dictionary } from "./dictionary.js";
 import { scoreWord, makeRunState, type RunState, type Card, type Breakdown } from "./run/engine.js";
 import { STARTER_DECK, TUTORIAL_DECK, DRAFT_POOL } from "./run/cards.js";
+import { randomBoss, type Boss } from "./run/bosses.js";
+import { RelicCard } from "./RelicCard.js";
 import { sound } from "./sound.js";
 import { music } from "./music.js";
+
+function buzz(pattern: number | number[]) {
+  try {
+    navigator.vibrate?.(pattern);
+  } catch {
+    /* unsupported */
+  }
+}
 
 const SIZE = 5;
 const TIME_BUDGET = 90;
@@ -81,6 +91,8 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   // Relic names that lit up on the last word (for the trigger-glow) + a score-fly.
   const [flash, setFlash] = useState<Set<string>>(() => new Set());
   const [fly, setFly] = useState<{ id: number; total: number } | null>(null);
+  const [boss, setBoss] = useState<Boss | null>(null);
+  const blocked = useMemo(() => new Set(boss?.blocked?.(SIZE, boardSeed) ?? []), [boss, boardSeed]);
   const tracing = useRef(false);
   const target = targetFor(boardIdx);
   const ready = dict !== null;
@@ -115,7 +127,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   }, [timeLeft, running]);
 
   const extendTo = (i: number) => {
-    if (i < 0 || phase !== "play") return;
+    if (i < 0 || phase !== "play" || blocked.has(i)) return;
     setPath((p) => {
       let np = p;
       if (p.length && p[p.length - 1] === i) np = p;
@@ -134,6 +146,12 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     const word = pathWord(cur, board);
     if (word.length < MIN_WORD_LEN || found.has(word) || !dict.has(word)) {
       sound.invalid();
+      buzz(25);
+      return;
+    }
+    if (boss?.allow && !boss.allow(word, found)) {
+      sound.invalid();
+      buzz([0, 22, 40, 22]);
       return;
     }
     const b = scoreWord(word, deck, run);
@@ -148,7 +166,19 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setFlash(new Set(b.triggers.map((t) => t.card)));
     window.setTimeout(() => setFlash(new Set()), 720);
     setFly({ id: Date.now(), total: b.total });
+    buzz(12); // a little pulse on every word
     sound.found(Math.min(11, Math.round(b.total / 40) + 1));
+    // One-word boss: this single word decides the board.
+    if (boss?.oneWord) {
+      const survived = boardScore + b.total >= target;
+      window.setTimeout(() => {
+        if (survived) clearBoard();
+        else {
+          setPhase("dead");
+          sound.timeUp();
+        }
+      }, 1300);
+    }
   };
 
   const openingPick = (card: Card) => {
@@ -157,8 +187,11 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   };
 
   const advanceBoard = () => {
-    setBoardIdx((n) => n + 1);
-    setBoardSeed(Date.now());
+    const nb = boardIdx + 1;
+    const newSeed = Date.now();
+    setBoardIdx(nb);
+    setBoardSeed(newSeed);
+    setBoss(nb % 6 === 0 ? randomBoss(newSeed) : null); // a boss every 6th board
     setBoardScore(0);
     setTimeLeft(TIME_BUDGET);
     setFound(new Set());
@@ -169,8 +202,9 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   // Beating a board: bank coins (base + interest, Balatro-style), a calm chime,
   // then the free draft.
   const clearBoard = () => {
-    setCoins((c) => c + 5 + Math.min(5, Math.floor(c / 5)));
+    setCoins((c) => c + 5 + Math.min(5, Math.floor(c / 5)) + (boss ? 8 : 0));
     sound.levelClear();
+    setBoss(null);
     setDraft(pickN(deck));
     setPhase("draft");
   };
@@ -210,10 +244,14 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
 
   return (
     <div className="run">
-      <button className="icon-btn menu-btn" aria-label="Exit" onClick={onExit}>
-        ✕
-      </button>
-      <div className="coins" key={coins}>🪙 {coins}</div>
+      <div className="run-header">
+        <button className="icon-btn" aria-label="Exit" onClick={onExit}>
+          ✕
+        </button>
+        <div className="coins" key={coins}>
+          🪙 {coins}
+        </div>
+      </div>
 
       <header className="run-top">
         <div className="stat">
@@ -244,17 +282,17 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
         <span className="deck-label">◈ your relics · {deck.length}</span>
         <div className="deck">
           {deck.map((c, i) => (
-            <div
-              key={c.id + i}
-              className={`rcard r-${c.rarity} k-${c.kind}${flash.has(c.name) ? " flash" : ""}`}
-              title={c.text}
-            >
-              <b>{c.name}</b>
-              <span>{c.text}</span>
-            </div>
+            <RelicCard key={c.id + i} card={c} mode="chip" flash={flash.has(c.name)} />
           ))}
         </div>
       </div>
+
+      {boss && phase === "play" && (
+        <div className="boss-banner">
+          <span className="boss-name">☠ boss · {boss.name}</span>
+          <span className="boss-blurb">{boss.blurb}</span>
+        </div>
+      )}
 
       {/* Live breakdown / toast */}
       <div className="breakdown">
@@ -293,16 +331,22 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
         >
           {board.cells.map((c, i) => {
             const order = path.indexOf(i);
+            const isBlocked = blocked.has(i);
             return (
-              <div key={i} data-cell={i} className={`tile${order >= 0 ? " on" : ""}${order === path.length - 1 ? " head" : ""}`} style={{ ["--i" as string]: i }}>
-                {c.label}
+              <div
+                key={i}
+                data-cell={i}
+                className={`tile${order >= 0 ? " on" : ""}${order === path.length - 1 ? " head" : ""}${isBlocked ? " blocked" : ""}`}
+                style={{ ["--i" as string]: i }}
+              >
+                {isBlocked ? "" : c.label}
               </div>
             );
           })}
         </div>
       </div>
 
-      {boardScore >= target && phase === "play" && (
+      {boardScore >= target && phase === "play" && !boss?.oneWord && (
         <button className="btn primary next-btn" onClick={clearBoard}>
           Target hit — bank &amp; draft →
         </button>
@@ -316,15 +360,12 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
             <div className="menu-title">{phase === "opening" ? "Choose your opening relic" : "Draft a relic"}</div>
             <div className="draft-row">
               {draft.map((c) => (
-                <button
+                <RelicCard
                   key={c.id}
-                  className={`rcard pick r-${c.rarity} k-${c.kind}`}
+                  card={c}
+                  mode="full"
                   onClick={() => (phase === "opening" ? openingPick(c) : pickDraft(c))}
-                >
-                  <b>{c.name}</b>
-                  <span>{c.text}</span>
-                  <em className="r-tag">{c.rarity}</em>
-                </button>
+                />
               ))}
             </div>
             {phase === "opening" && (
@@ -336,25 +377,22 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
 
       {phase === "shop" && (
         <div className="menu-veil">
-          <div className="draft-card">
-            <div className="menu-title">Shop · 🪙 {coins}</div>
+          <div className="shop-card">
+            <div className="shop-head">
+              <span className="shop-title">🗝️ The Relic Vault</span>
+              <span className="shop-coins">🪙 {coins}</span>
+            </div>
             <div className="draft-row">
-              {shopStock.map((c) => {
-                const price = PRICE[c.rarity];
-                const afford = coins >= price;
-                return (
-                  <button
-                    key={c.id}
-                    className={`rcard pick r-${c.rarity} k-${c.kind}`}
-                    disabled={!afford}
-                    onClick={() => buy(c)}
-                  >
-                    <b>{c.name}</b>
-                    <span>{c.text}</span>
-                    <em className="r-tag">🪙 {price}</em>
-                  </button>
-                );
-              })}
+              {shopStock.map((c) => (
+                <RelicCard
+                  key={c.id}
+                  card={c}
+                  mode="full"
+                  price={PRICE[c.rarity]}
+                  disabled={coins < PRICE[c.rarity]}
+                  onClick={() => buy(c)}
+                />
+              ))}
               {shopStock.length === 0 && <div className="draft-sub">sold out — nice haul</div>}
             </div>
             <div className="shop-actions">

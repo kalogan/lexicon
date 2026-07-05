@@ -57,8 +57,7 @@ export function App() {
   if (phase === "gate") {
     return (
       <StartGate
-        label="Lexicon"
-        hint="tap to begin"
+        label="tap to begin"
         onBegin={() => {
           sound.unlock();
           setPhase("ident");
