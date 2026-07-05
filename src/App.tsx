@@ -4,11 +4,12 @@
  * zen) round on the letter grid → results. THREE-free; the kit supplies the
  * front door (title) and determinism (prng).
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StudioIdent, TitleScreen } from "game-kit/title/r3f";
 import type { MenuOption } from "game-kit/title";
 import { PlayScreen, type RoundResult } from "./PlayScreen.js";
 import { ResultsScreen } from "./ResultsScreen.js";
+import { loadDictionary } from "./dictionary.js";
 
 type Phase = "ident" | "title" | "play" | "results";
 
@@ -25,6 +26,11 @@ export function App() {
   const [result, setResult] = useState<RoundResult | null>(null);
   const [best, setBest] = useState(loadBest);
   const [isNewBest, setIsNewBest] = useState(false);
+
+  // Warm the (async, code-split) dictionary early so it's ready by first play.
+  useEffect(() => {
+    void loadDictionary();
+  }, []);
 
   const startRound = (dur: number) => {
     setDurationSec(dur);

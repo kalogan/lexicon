@@ -83,26 +83,21 @@ body,
   letter-spacing: 0.28em;
   padding-left: 0.28em;
   color: var(--lex-ink);
-  transition: color 120ms ease, transform 120ms ease;
+  transition: color 120ms ease;
 }
-.current:not(.ok):not(.bad) {
+/* live trace feedback */
+.current.live-idle {
   color: var(--lex-muted);
   font-weight: 700;
   letter-spacing: 0.12em;
   font-size: 18px;
 }
-.current.ok {
-  color: var(--lex-ok);
-  animation: pop 0.4s ease;
-}
-.current.bad {
+.current.live-prefix { color: var(--lex-ink); }
+.current.live-ok { color: var(--lex-ok); }
+.current.live-dead { color: var(--lex-muted); opacity: 0.65; }
+.current.live-bad {
   color: var(--lex-bad);
   animation: shake 0.4s ease;
-}
-@keyframes pop {
-  0% { transform: scale(0.9); }
-  50% { transform: scale(1.08); }
-  100% { transform: scale(1); }
 }
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
@@ -110,11 +105,40 @@ body,
   75% { transform: translateX(7px); }
 }
 
+.board-wrap {
+  position: relative;
+}
 .board {
-  width: min(92vw, 440px);
+  width: 100%;
   display: grid;
   gap: min(2.6vw, 12px);
   touch-action: none;
+}
+.trace-line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.trace-line polyline {
+  stroke: var(--lex-accent);
+  opacity: 0.9;
+  transition: stroke 90ms ease;
+}
+.trace-ok polyline { stroke: var(--lex-ok); }
+.trace-dead polyline { stroke: var(--lex-bad); opacity: 0.55; }
+
+.loading-veil {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(244, 239, 228, 0.86);
+  color: var(--lex-muted);
+  letter-spacing: 0.1em;
+  font-size: 16px;
 }
 .tile {
   aspect-ratio: 1;

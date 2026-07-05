@@ -1,8 +1,9 @@
 /**
  * PlayScreen — a round of Lexicon: trace words on the letter grid before the
  * timer runs out. Drag across adjacent tiles (touch or mouse) to spell a word;
- * lift to submit. Valid dictionary words (≥3 letters, not already found) score
- * by length. Zen mode drops the timer.
+ * lift to submit. Live feedback colours the current word — ink while it's still
+ * a valid prefix, green the moment it's a real word, muted-red at a dead end —
+ * and a line follows the trace. Valid words (≥3, unseen) score by length.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -13,7 +14,7 @@ import {
   MIN_WORD_LEN,
   type Board,
 } from "./board.js";
-import { getDictionary } from "./dictionary.js";
+import { loadDictionary, readyDictionary, type Dictionary } from "./dictionary.js";
 
 export interface FoundWord {
   word: string;
@@ -37,6 +38,12 @@ function cellAt(x: number, y: number): number {
   return cell ? Number(cell.getAttribute("data-cell")) : -1;
 }
 
+/** Centre of cell `i` in the board's 0..100 viewBox space (gaps ignored — close
+ *  enough for a trace line). */
+function cellCenter(i: number, size: number): [number, number] {
+  return [((i % size) + 0.5) * (100 / size), (Math.floor(i / size) + 0.5) * (100 / size)];
+}
+
 export function PlayScreen({
   seed,
   durationSec,
@@ -48,7 +55,7 @@ export function PlayScreen({
   onDone: (r: RoundResult) => void;
 }) {
   const board: Board = useMemo(() => makeBoard(seed), [seed]);
-  const dict = useMemo(() => getDictionary(), []);
+  const [dict, setDict] = useState<Dictionary | null>(() => readyDictionary());
   const [path, setPath] = useState<number[]>([]);
   const [found, setFound] = useState<FoundWord[]>([]);
   const [score, setScore] = useState(0);
@@ -56,10 +63,16 @@ export function PlayScreen({
   const [flash, setFlash] = useState<"ok" | "bad" | null>(null);
   const tracing = useRef(false);
   const timed = Number.isFinite(durationSec);
+  const ready = dict !== null;
 
-  // Countdown. When it hits 0, end the round.
+  // Ensure the dictionary is loaded (usually already warmed at app mount).
   useEffect(() => {
-    if (!timed) return;
+    if (!dict) loadDictionary().then(setDict);
+  }, [dict]);
+
+  // Countdown — only once the dictionary is ready (don't burn time on a loader).
+  useEffect(() => {
+    if (!timed || !ready) return;
     if (timeLeft <= 0) {
       onDone({ found, score });
       return;
@@ -67,7 +80,7 @@ export function PlayScreen({
     const id = window.setTimeout(() => setTimeLeft((t) => t - 1), 1000);
     return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft, timed]);
+  }, [timeLeft, timed, ready]);
 
   const doFlash = (kind: "ok" | "bad") => {
     setFlash(kind);
@@ -88,7 +101,7 @@ export function PlayScreen({
     tracing.current = false;
     const cur = path;
     setPath([]);
-    if (cur.length < MIN_WORD_LEN) return;
+    if (cur.length < MIN_WORD_LEN || !dict) return;
     const word = pathWord(cur, board);
     if (word.length < MIN_WORD_LEN) return;
     if (found.some((f) => f.word === word)) return doFlash("bad");
@@ -100,6 +113,13 @@ export function PlayScreen({
   };
 
   const curWord = pathWord(path, board);
+  // Live state of the in-progress trace, for colour feedback.
+  let liveKind: "ok" | "prefix" | "dead" | "idle" = "idle";
+  if (curWord.length >= 1 && dict) {
+    if (curWord.length >= MIN_WORD_LEN && dict.has(curWord) && !found.some((f) => f.word === curWord)) liveKind = "ok";
+    else if (dict.hasPrefix(curWord)) liveKind = "prefix";
+    else liveKind = "dead";
+  }
 
   return (
     <div className="play">
@@ -108,7 +128,7 @@ export function PlayScreen({
           <span className="stat-num">{score}</span>
           <span className="stat-label">score</span>
         </div>
-        <div className={`stat timer${timed && timeLeft <= 10 ? " low" : ""}`}>
+        <div className={`stat timer${timed && ready && timeLeft <= 10 ? " low" : ""}`}>
           <span className="stat-num">{timed ? mmss(Math.max(0, timeLeft)) : "∞"}</span>
           <span className="stat-label">{timed ? "time" : "zen"}</span>
         </div>
@@ -118,38 +138,52 @@ export function PlayScreen({
         </div>
       </header>
 
-      <div className={`current${flash ? " " + flash : ""}`}>
+      <div className={`current live-${flash ?? liveKind}`}>
         {curWord ? curWord.toUpperCase() : found[0] ? found[0].word.toUpperCase() : "trace a word"}
       </div>
 
-      <div
-        className="board"
-        style={{ gridTemplateColumns: `repeat(${board.size}, 1fr)` }}
-        onPointerDown={(e) => {
-          (e.target as Element).releasePointerCapture?.(e.pointerId);
-          tracing.current = true;
-          extendTo(cellAt(e.clientX, e.clientY));
-        }}
-        onPointerMove={(e) => {
-          if (!tracing.current) return;
-          extendTo(cellAt(e.clientX, e.clientY));
-        }}
-        onPointerUp={submit}
-        onPointerCancel={submit}
-        onPointerLeave={() => tracing.current && submit()}
-      >
-        {board.cells.map((c, i) => {
-          const order = path.indexOf(i);
-          return (
-            <div
-              key={i}
-              data-cell={i}
-              className={`tile${order >= 0 ? " on" : ""}${order === path.length - 1 ? " head" : ""}`}
-            >
-              {c.label}
-            </div>
-          );
-        })}
+      <div className="board-wrap" style={{ width: "min(92vw, 440px)" }}>
+        <div
+          className="board"
+          style={{ gridTemplateColumns: `repeat(${board.size}, 1fr)` }}
+          onPointerDown={(e) => {
+            (e.target as Element).releasePointerCapture?.(e.pointerId);
+            tracing.current = true;
+            extendTo(cellAt(e.clientX, e.clientY));
+          }}
+          onPointerMove={(e) => {
+            if (!tracing.current) return;
+            extendTo(cellAt(e.clientX, e.clientY));
+          }}
+          onPointerUp={submit}
+          onPointerCancel={submit}
+          onPointerLeave={() => tracing.current && submit()}
+        >
+          {board.cells.map((c, i) => {
+            const order = path.indexOf(i);
+            return (
+              <div
+                key={i}
+                data-cell={i}
+                className={`tile${order >= 0 ? " on" : ""}${order === path.length - 1 ? " head" : ""}`}
+              >
+                {c.label}
+              </div>
+            );
+          })}
+        </div>
+        {path.length >= 2 && (
+          <svg className={`trace-line trace-${liveKind}`} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <polyline
+              points={path.map((i) => cellCenter(i, board.size).join(",")).join(" ")}
+              fill="none"
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
+        )}
       </div>
 
       <div className="found">
@@ -161,11 +195,13 @@ export function PlayScreen({
         ))}
       </div>
 
-      {!timed && (
+      {!timed && ready && (
         <button className="end-btn" onClick={() => onDone({ found, score })}>
           End round
         </button>
       )}
+
+      {!ready && <div className="loading-veil">gathering the dictionary…</div>}
     </div>
   );
 }
