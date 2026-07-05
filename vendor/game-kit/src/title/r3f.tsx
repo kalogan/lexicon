@@ -2,6 +2,13 @@
  * title — the studio-ident + title-screen DOM views (react). Named `r3f.tsx` to
  * match the kit's "React view" slot; the views are plain DOM (no three).
  *
+ *  - <StartGate>    — a "tap to begin" full-screen gate that plays BEFORE the
+ *                     ident. Its whole job is to capture the FIRST user gesture
+ *                     (pointer or Enter/Space) so a game can unlock its
+ *                     AudioContext — browsers suspend audio until a gesture, so a
+ *                     cold load can't start music/SFX otherwise. It fires onBegin
+ *                     once and lets the parent advance (to StudioIdent, then
+ *                     TitleScreen). Mined from corrupted-void-v2's startup.
  *  - <StudioIdent>  — a skippable, wall-clock-timed brand ident. You nest your
  *                     brand art as children (self-animating via its own CSS, the
  *                     way CHIMERA's SVG goober does); the kit owns the timing,
@@ -57,6 +64,108 @@ const skipBtn: CSSProperties = {
   fontSize: 13,
   letterSpacing: '0.06em',
 };
+
+export interface StartGateProps {
+  /** Fired once on the first user gesture (pointer or Enter/Space). The parent is
+   *  expected to unlock its AudioContext here and advance past the gate. */
+  onBegin: () => void;
+  /** Prompt line (default "tap to begin"). */
+  label?: string;
+  /** Smaller line under the label (e.g. "press any key or tap the screen"). */
+  hint?: string;
+  /** CSS background (color or gradient). Defaults to the ident's parchment. */
+  background?: string;
+  className?: string;
+}
+
+/**
+ * A "tap to begin" gate that captures the FIRST user gesture so the game can
+ * unlock its AudioContext (browsers keep it suspended until a gesture). Fires
+ * `onBegin` exactly once — pointer OR keyboard (Enter/Space) — then the parent
+ * advances and this unmounts. It does NOT own the next-screen state.
+ */
+export function StartGate({
+  onBegin,
+  label = 'tap to begin',
+  hint,
+  background = 'radial-gradient(circle at 50% 42%, #fbf3e2 0%, #efe0c2 58%, #e4d0a8 100%)',
+  className,
+}: StartGateProps) {
+  const begunRef = useRef(false);
+  const reduced = prefersReducedMotion();
+
+  const begin = () => {
+    if (begunRef.current) return;
+    begunRef.current = true;
+    onBegin();
+  };
+
+  // Focus the gate on mount so Enter/Space reach it without a prior click, and
+  // catch keys at the window level too (in case focus lands elsewhere).
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    rootRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        begin();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div
+      ref={rootRef}
+      className={className}
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      onPointerDown={begin}
+      style={{ ...fullscreen, zIndex: 110, background, cursor: 'pointer', outline: 'none', touchAction: 'none' }}
+    >
+      <div
+        style={{
+          textAlign: 'center',
+          pointerEvents: 'none',
+          paddingLeft: 'env(safe-area-inset-left, 0px)',
+          paddingRight: 'env(safe-area-inset-right, 0px)',
+        }}
+      >
+        <div
+          style={{
+            fontSize: 'clamp(20px, 6vw, 34px)',
+            fontWeight: 700,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            color: 'var(--title-startgate-fg, #6b4a30)',
+            animation: reduced ? undefined : 'gk-startgate-breathe 2.4s ease-in-out infinite',
+          }}
+        >
+          {label}
+        </div>
+        {hint && (
+          <div
+            style={{
+              marginTop: 14,
+              fontSize: 'clamp(11px, 3.4vw, 15px)',
+              letterSpacing: '0.06em',
+              color: 'var(--title-startgate-hint, #8a6a3f)',
+              opacity: 0.75,
+            }}
+          >
+            {hint}
+          </div>
+        )}
+      </div>
+      {!reduced && (
+        <style>{'@keyframes gk-startgate-breathe{0%,100%{opacity:.55}50%{opacity:1}}'}</style>
+      )}
+    </div>
+  );
+}
 
 export interface StudioIdentProps {
   /** Brand wordmark (e.g. "WOVENWILD"). */

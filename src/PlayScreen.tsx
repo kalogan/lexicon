@@ -1,9 +1,8 @@
 /**
  * PlayScreen — a round of Lexicon: trace words on the letter grid before the
- * timer runs out. Drag across adjacent tiles (touch or mouse) to spell a word;
- * lift to submit. Live feedback colours the current word — ink while it's still
- * a valid prefix, green the moment it's a real word, muted-red at a dead end —
- * and a line follows the trace. Valid words (≥3, unseen) score by length.
+ * timer runs out. Drag across adjacent tiles (touch/mouse) to spell; lift to
+ * submit. Live colour + a trace line show whether the word is a valid prefix,
+ * a real word, or a dead end. Pause for a menu (resume / restart / exit / mute).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -15,6 +14,7 @@ import {
   type Board,
 } from "./board.js";
 import { loadDictionary, readyDictionary, type Dictionary } from "./dictionary.js";
+import { sound } from "./sound.js";
 
 export interface FoundWord {
   word: string;
@@ -31,56 +31,70 @@ function mmss(sec: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-/** Index of the DOM cell under a client point, or -1. */
 function cellAt(x: number, y: number): number {
   const el = document.elementFromPoint(x, y);
   const cell = el?.closest("[data-cell]");
   return cell ? Number(cell.getAttribute("data-cell")) : -1;
 }
 
-/** Centre of cell `i` in the board's 0..100 viewBox space (gaps ignored — close
- *  enough for a trace line). */
 function cellCenter(i: number, size: number): [number, number] {
   return [((i % size) + 0.5) * (100 / size), (Math.floor(i / size) + 0.5) * (100 / size)];
 }
 
+function buzz(pattern: number | number[]) {
+  try {
+    navigator.vibrate?.(pattern);
+  } catch {
+    /* not supported */
+  }
+}
+
 export function PlayScreen({
   seed,
+  size,
   durationSec,
   onDone,
+  onRestart,
+  onExit,
 }: {
   seed: number;
-  /** Round length in seconds; `Infinity` = zen (no timer). */
+  size: number;
   durationSec: number;
   onDone: (r: RoundResult) => void;
+  onRestart: () => void;
+  onExit: () => void;
 }) {
-  const board: Board = useMemo(() => makeBoard(seed), [seed]);
+  const board: Board = useMemo(() => makeBoard(seed, size), [seed, size]);
   const [dict, setDict] = useState<Dictionary | null>(() => readyDictionary());
   const [path, setPath] = useState<number[]>([]);
   const [found, setFound] = useState<FoundWord[]>([]);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(durationSec);
   const [flash, setFlash] = useState<"ok" | "bad" | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [muted, setMuted] = useState(() => sound.isMuted());
+  const [pop, setPop] = useState<{ id: number; points: number } | null>(null);
   const tracing = useRef(false);
   const timed = Number.isFinite(durationSec);
   const ready = dict !== null;
+  const running = ready && !menuOpen;
 
-  // Ensure the dictionary is loaded (usually already warmed at app mount).
   useEffect(() => {
     if (!dict) loadDictionary().then(setDict);
   }, [dict]);
 
-  // Countdown — only once the dictionary is ready (don't burn time on a loader).
+  // Countdown — paused while the menu is open or the dictionary is still loading.
   useEffect(() => {
-    if (!timed || !ready) return;
+    if (!timed || !running) return;
     if (timeLeft <= 0) {
       onDone({ found, score });
       return;
     }
+    if (timeLeft <= 10) sound.tick();
     const id = window.setTimeout(() => setTimeLeft((t) => t - 1), 1000);
     return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft, timed, ready]);
+  }, [timeLeft, timed, running]);
 
   const doFlash = (kind: "ok" | "bad") => {
     setFlash(kind);
@@ -88,12 +102,14 @@ export function PlayScreen({
   };
 
   const extendTo = (i: number) => {
-    if (i < 0) return;
+    if (i < 0 || menuOpen) return;
     setPath((p) => {
-      if (p.length && p[p.length - 1] === i) return p;
-      if (p.length >= 2 && p[p.length - 2] === i) return p.slice(0, -1); // backtrack
-      if (canExtend(p, i, board.size)) return [...p, i];
-      return p;
+      let np = p;
+      if (p.length && p[p.length - 1] === i) np = p;
+      else if (p.length >= 2 && p[p.length - 2] === i) np = p.slice(0, -1); // backtrack
+      else if (canExtend(p, i, size)) np = [...p, i];
+      if (np.length > p.length) sound.tap();
+      return np;
     });
   };
 
@@ -104,16 +120,21 @@ export function PlayScreen({
     if (cur.length < MIN_WORD_LEN || !dict) return;
     const word = pathWord(cur, board);
     if (word.length < MIN_WORD_LEN) return;
-    if (found.some((f) => f.word === word)) return doFlash("bad");
-    if (!dict.has(word)) return doFlash("bad");
+    if (found.some((f) => f.word === word) || !dict.has(word)) {
+      sound.invalid();
+      buzz(28);
+      return doFlash("bad");
+    }
     const points = wordScore(word.length);
     setFound((f) => [{ word, points }, ...f]);
     setScore((s) => s + points);
+    setPop({ id: Date.now(), points });
+    sound.found(points);
+    buzz(12);
     doFlash("ok");
   };
 
   const curWord = pathWord(path, board);
-  // Live state of the in-progress trace, for colour feedback.
   let liveKind: "ok" | "prefix" | "dead" | "idle" = "idle";
   if (curWord.length >= 1 && dict) {
     if (curWord.length >= MIN_WORD_LEN && dict.has(curWord) && !found.some((f) => f.word === curWord)) liveKind = "ok";
@@ -121,14 +142,31 @@ export function PlayScreen({
     else liveKind = "dead";
   }
 
+  const toggleMute = () => {
+    const m = !muted;
+    sound.setMuted(m);
+    setMuted(m);
+    if (!m) sound.tap();
+  };
+
   return (
     <div className="play">
       <header className="play-top">
+        <button className="icon-btn menu-btn" aria-label="Menu" onClick={() => setMenuOpen(true)}>
+          ☰
+        </button>
         <div className="stat">
-          <span className="stat-num">{score}</span>
+          <span className="stat-num" key={score}>
+            {score}
+          </span>
           <span className="stat-label">score</span>
+          {pop && (
+            <span key={pop.id} className="points-pop">
+              +{pop.points}
+            </span>
+          )}
         </div>
-        <div className={`stat timer${timed && ready && timeLeft <= 10 ? " low" : ""}`}>
+        <div className={`stat timer${timed && running && timeLeft <= 10 ? " low" : ""}`}>
           <span className="stat-num">{timed ? mmss(Math.max(0, timeLeft)) : "∞"}</span>
           <span className="stat-label">{timed ? "time" : "zen"}</span>
         </div>
@@ -145,8 +183,9 @@ export function PlayScreen({
       <div className="board-wrap" style={{ width: "min(92vw, 440px)" }}>
         <div
           className="board"
-          style={{ gridTemplateColumns: `repeat(${board.size}, 1fr)` }}
+          style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
           onPointerDown={(e) => {
+            if (menuOpen) return;
             (e.target as Element).releasePointerCapture?.(e.pointerId);
             tracing.current = true;
             extendTo(cellAt(e.clientX, e.clientY));
@@ -166,6 +205,7 @@ export function PlayScreen({
                 key={i}
                 data-cell={i}
                 className={`tile${order >= 0 ? " on" : ""}${order === path.length - 1 ? " head" : ""}`}
+                style={{ ["--i" as string]: i }}
               >
                 {c.label}
               </div>
@@ -175,7 +215,7 @@ export function PlayScreen({
         {path.length >= 2 && (
           <svg className={`trace-line trace-${liveKind}`} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
             <polyline
-              points={path.map((i) => cellCenter(i, board.size).join(",")).join(" ")}
+              points={path.map((i) => cellCenter(i, size).join(",")).join(" ")}
               fill="none"
               strokeWidth={3}
               strokeLinecap="round"
@@ -195,13 +235,27 @@ export function PlayScreen({
         ))}
       </div>
 
-      {!timed && ready && (
-        <button className="end-btn" onClick={() => onDone({ found, score })}>
-          End round
-        </button>
-      )}
-
       {!ready && <div className="loading-veil">gathering the dictionary…</div>}
+
+      {menuOpen && (
+        <div className="menu-veil">
+          <div className="menu-card">
+            <div className="menu-title">Paused</div>
+            <button className="btn primary" onClick={() => setMenuOpen(false)}>
+              Resume
+            </button>
+            <button className="btn" onClick={onRestart}>
+              Restart
+            </button>
+            <button className="btn" onClick={toggleMute}>
+              Sound: {muted ? "off" : "on"}
+            </button>
+            <button className="btn ghost" onClick={onExit}>
+              Exit to menu
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

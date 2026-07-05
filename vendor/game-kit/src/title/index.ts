@@ -1,10 +1,12 @@
 /**
- * title — the game's front door: a skippable STUDIO IDENT that plays first, then
- * a TITLE SCREEN (backdrop + wordmark + menu options), parameterized by brand.
+ * title — the game's front door: an optional "tap to begin" START GATE (captures
+ * the first gesture so a game can unlock its suspended AudioContext), then a
+ * skippable STUDIO IDENT, then a TITLE SCREEN (backdrop + wordmark + menu
+ * options) — all parameterized by brand.
  *
  * This `index.ts` is the THREE-free, React-free core: shared TYPES + the small
- * pure helpers worth testing. The DOM views — `<StudioIdent>`, `<TitleScreen>` —
- * live in `r3f.tsx` (the kit's "React view" slot; the views are plain DOM).
+ * pure helpers worth testing. The DOM views — `<StartGate>`, `<StudioIdent>`,
+ * `<TitleScreen>` — live in `r3f.tsx` (the kit's "React view" slot; plain DOM).
  *
  * Distilled from CHIMERA (studio-logo.tsx WOVENWILD ident → shell/splash.tsx
  * title with New Game / Continue / Settings over a 3D backdrop) and GYRE (no

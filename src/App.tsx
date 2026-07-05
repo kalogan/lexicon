@@ -1,30 +1,32 @@
 /**
  * LEXICON — a stylish word-hunt puzzle (Boggle lineage), built on game-kit as a
- * kit-hardening vehicle. Flow: studio ident → title (mode select) → a timed (or
- * zen) round on the letter grid → results. THREE-free; the kit supplies the
- * front door (title) and determinism (prng).
+ * kit-hardening vehicle. Flow: (tap-to-begin gate →) studio ident → title (mode
+ * select) → a round on the letter grid → results. Each difficulty keeps its own
+ * best score. THREE-free; the kit supplies the front door + determinism (prng).
  */
 import { useEffect, useState } from "react";
-import { StudioIdent, TitleScreen } from "game-kit/title/r3f";
+import { StartGate, StudioIdent, TitleScreen } from "game-kit/title/r3f";
 import type { MenuOption } from "game-kit/title";
 import { PlayScreen, type RoundResult } from "./PlayScreen.js";
 import { ResultsScreen } from "./ResultsScreen.js";
 import { loadDictionary } from "./dictionary.js";
+import { MODES, type Mode } from "./modes.js";
+import { sound } from "./sound.js";
 
-type Phase = "ident" | "title" | "play" | "results";
+type Phase = "gate" | "ident" | "title" | "play" | "results";
 
-const BEST_KEY = "lexicon:best";
-function loadBest(): number {
-  const v = Number(localStorage.getItem(BEST_KEY));
+const bestKey = (modeId: string) => `lexicon:best:${modeId}`;
+function loadBest(modeId: string): number {
+  const v = Number(localStorage.getItem(bestKey(modeId)));
   return Number.isFinite(v) ? v : 0;
 }
 
 export function App() {
-  const [phase, setPhase] = useState<Phase>("ident");
-  const [durationSec, setDurationSec] = useState(180);
+  const [phase, setPhase] = useState<Phase>("gate");
+  const [mode, setMode] = useState<Mode>(MODES[0]!);
   const [seed, setSeed] = useState(() => Date.now());
   const [result, setResult] = useState<RoundResult | null>(null);
-  const [best, setBest] = useState(loadBest);
+  const [best, setBest] = useState(0);
   const [isNewBest, setIsNewBest] = useState(false);
 
   // Warm the (async, code-split) dictionary early so it's ready by first play.
@@ -32,34 +34,54 @@ export function App() {
     void loadDictionary();
   }, []);
 
-  const startRound = (dur: number) => {
-    setDurationSec(dur);
+  const startRound = (m: Mode) => {
+    setMode(m);
     setSeed(Date.now());
+    setBest(loadBest(m.id));
     setResult(null);
     setIsNewBest(false);
+    sound.begin();
     setPhase("play");
   };
 
   const finishRound = (r: RoundResult) => {
-    const beat = r.score > best;
+    const prev = loadBest(mode.id);
+    const beat = r.score > prev;
     if (beat) {
-      localStorage.setItem(BEST_KEY, String(r.score));
+      localStorage.setItem(bestKey(mode.id), String(r.score));
       setBest(r.score);
+    } else {
+      setBest(prev);
     }
     setIsNewBest(beat && r.score > 0);
     setResult(r);
+    sound.timeUp();
     setPhase("results");
   };
+
+  if (phase === "gate") {
+    return (
+      <StartGate
+        label="Lexicon"
+        hint="tap to begin"
+        onBegin={() => {
+          sound.unlock();
+          setPhase("ident");
+        }}
+      />
+    );
+  }
 
   if (phase === "ident") {
     return <StudioIdent wordmark="WOVENWILD" tagline="games" onDone={() => setPhase("title")} />;
   }
 
   if (phase === "title") {
-    const options: MenuOption[] = [
-      { label: "Play · 3 min", primary: true, onSelect: () => startRound(180) },
-      { label: "Zen · no timer", onSelect: () => startRound(Infinity) },
-    ];
+    const options: MenuOption[] = MODES.map((m) => ({
+      label: `${m.label} · ${m.blurb}`,
+      primary: m.id === "standard",
+      onSelect: () => startRound(m),
+    }));
     return (
       <TitleScreen
         title="LEXICON"
@@ -71,7 +93,17 @@ export function App() {
   }
 
   if (phase === "play") {
-    return <PlayScreen seed={seed} durationSec={durationSec} onDone={finishRound} />;
+    return (
+      <PlayScreen
+        key={seed}
+        seed={seed}
+        size={mode.size}
+        durationSec={mode.durationSec}
+        onDone={finishRound}
+        onRestart={() => startRound(mode)}
+        onExit={() => setPhase("title")}
+      />
+    );
   }
 
   return (
@@ -79,7 +111,8 @@ export function App() {
       result={result ?? { found: [], score: 0 }}
       best={best}
       isNewBest={isNewBest}
-      onPlayAgain={() => startRound(durationSec)}
+      modeLabel={mode.label}
+      onPlayAgain={() => startRound(mode)}
       onHome={() => setPhase("title")}
     />
   );

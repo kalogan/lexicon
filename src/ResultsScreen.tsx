@@ -13,12 +13,14 @@ export function ResultsScreen({
   result,
   best,
   isNewBest,
+  modeLabel,
   onPlayAgain,
   onHome,
 }: {
   result: RoundResult;
   best: number;
   isNewBest: boolean;
+  modeLabel: string;
   onPlayAgain: () => void;
   onHome: () => void;
 }) {
@@ -29,6 +31,7 @@ export function ResultsScreen({
   return (
     <div className="results">
       <div className="results-card">
+        <div className="results-mode">{modeLabel}</div>
         {isNewBest && <div className="newbest">◈ new best ◈</div>}
         <div className="results-score">{score}</div>
         <div className="results-sub">points · {found.length} words</div>
