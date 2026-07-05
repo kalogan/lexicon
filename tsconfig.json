@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["vitest/globals"],
+    "baseUrl": ".",
+    "paths": {
+      "game-kit": ["./vendor/game-kit/src/index.ts"],
+      "game-kit/r3f": ["./vendor/game-kit/src/r3f.ts"],
+      "game-kit/*/r3f": ["./vendor/game-kit/src/*/r3f.tsx"],
+      "game-kit/*": ["./vendor/game-kit/src/*/index.ts"]
+    }
+  },
+  "include": ["src"]
+}
