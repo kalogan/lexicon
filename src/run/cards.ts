@@ -9,6 +9,7 @@
  */
 import type { Card } from "./engine.js";
 import { EXTRA_CARDS } from "./cards-extra.js";
+import { EXTRA_CARDS2 } from "./cards-extra2.js";
 
 // ── Dictionaries (persistent) ────────────────────────────────────────────────
 
@@ -164,4 +165,5 @@ export const TUTORIAL_DECK: readonly Card[] = [ALPHABET, SCHOLAR, TIME_DICT, CHR
 export const DRAFT_POOL: readonly Card[] = [
   ...ALL_CARDS.filter((c) => c.id !== "alphabet" && c.id !== "tiny"),
   ...EXTRA_CARDS,
+  ...EXTRA_CARDS2,
 ];

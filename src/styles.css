@@ -662,3 +662,35 @@ body,
   color: #2b1c0c;
   border-color: transparent;
 }
+
+/* ── Economy (coins + shop) ──────────────────────────────────────────────── */
+.coins {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: 12px;
+  z-index: 5;
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 999px;
+  padding: 6px 13px;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--lex-accent-deep);
+  box-shadow: 0 2px 6px rgba(43, 36, 64, 0.12);
+  animation: score-pop 0.28s ease;
+}
+.shop-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+.shop-actions .btn {
+  flex: 1;
+}
+.rcard.pick:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.rcard.pick:disabled:hover {
+  transform: none;
+  box-shadow: 0 2px 6px rgba(43, 36, 64, 0.12);
+}

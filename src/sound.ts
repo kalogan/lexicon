@@ -309,6 +309,20 @@ class SoundManager {
       duration: 0.28,
     });
   }
+
+  /**
+   * levelClear — a smooth, calm chime for beating a board: a gentle rising major
+   * arpeggio (C–E–G–C) on soft sines with a slow release, over a warm low root.
+   * Reassuring and resolved, never loud.
+   */
+  levelClear(): void {
+    if (!this.ready()) return;
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+    notes.forEach((f, i) =>
+      this.tone({ wave: "sine", freq: f, gain: 0.1, delay: i * 0.12, attack: 0.01, duration: 0.6 }),
+    );
+    this.tone({ wave: "triangle", freq: 261.63, gain: 0.06, attack: 0.02, duration: 0.95 });
+  }
 }
 
 /** The shared singleton — import and call anywhere; safe before `unlock()`. */

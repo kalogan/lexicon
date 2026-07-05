@@ -36,13 +36,13 @@ function commit(run: RunState, b: Breakdown): RunState {
   };
 }
 
-function pick3(deck: readonly Card[]): Card[] {
+function pickN(deck: readonly Card[], n = 3): Card[] {
   const owned = new Set(deck.map((c) => c.id));
   const pool = DRAFT_POOL.filter((c) => !owned.has(c.id));
-  const src = pool.length >= 3 ? pool : [...pool, ...DRAFT_POOL]; // fall back to dupes late
+  const src = pool.length >= n ? pool : [...pool, ...DRAFT_POOL]; // fall back to dupes late
   const out: Card[] = [];
   const used = new Set<number>();
-  while (out.length < 3 && used.size < src.length) {
+  while (out.length < n && used.size < src.length) {
     const i = Math.floor(Math.random() * src.length);
     if (used.has(i)) continue;
     used.add(i);
@@ -50,6 +50,8 @@ function pick3(deck: readonly Card[]): Card[] {
   }
   return out;
 }
+
+const PRICE: Record<Card["rarity"], number> = { common: 4, uncommon: 6, rare: 8, legendary: 12 };
 
 export function RunScreen({ onExit }: { onExit: () => void }) {
   const firstRun = useRef(localStorage.getItem("lexicon:hasRun") !== "1");
@@ -69,10 +71,12 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const [path, setPath] = useState<number[]>([]);
   const [found, setFound] = useState<Set<string>>(() => new Set());
   // A real run opens with a 3-way choice; the first-ever run skips it (tutorial deck).
-  const [phase, setPhase] = useState<"opening" | "play" | "draft" | "dead">(() =>
+  const [phase, setPhase] = useState<"opening" | "play" | "draft" | "shop" | "dead">(() =>
     firstRun.current ? "play" : "opening",
   );
-  const [draft, setDraft] = useState<Card[]>(() => (firstRun.current ? [] : pick3(STARTER_DECK)));
+  const [draft, setDraft] = useState<Card[]>(() => (firstRun.current ? [] : pickN(STARTER_DECK)));
+  const [coins, setCoins] = useState(0);
+  const [shopStock, setShopStock] = useState<Card[]>([]);
   const [toast, setToast] = useState<Breakdown | null>(null);
   // Relic names that lit up on the last word (for the trigger-glow) + a score-fly.
   const [flash, setFlash] = useState<Set<string>>(() => new Set());
@@ -97,8 +101,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     if (!running) return;
     if (timeLeft <= 0) {
       if (boardScore >= target) {
-        setDraft(pick3(deck));
-        setPhase("draft");
+        clearBoard();
       } else {
         setPhase("dead");
         sound.timeUp();
@@ -153,8 +156,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setPhase("play");
   };
 
-  const nextBoard = (card: Card) => {
-    setDeck((d) => [...d, card]);
+  const advanceBoard = () => {
     setBoardIdx((n) => n + 1);
     setBoardSeed(Date.now());
     setBoardScore(0);
@@ -162,6 +164,43 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setFound(new Set());
     setRun((r) => ({ ...r, board: r.board + 1, boardWords: 0, lastFirst: null }));
     setPhase("play");
+  };
+
+  // Beating a board: bank coins (base + interest, Balatro-style), a calm chime,
+  // then the free draft.
+  const clearBoard = () => {
+    setCoins((c) => c + 5 + Math.min(5, Math.floor(c / 5)));
+    sound.levelClear();
+    setDraft(pickN(deck));
+    setPhase("draft");
+  };
+
+  // After the free draft, a shop opens every 3rd board; otherwise straight on.
+  const pickDraft = (card: Card) => {
+    const next = [...deck, card];
+    setDeck(next);
+    if (boardIdx % 3 === 0) {
+      setShopStock(pickN(next, 4));
+      setPhase("shop");
+    } else {
+      advanceBoard();
+    }
+  };
+
+  const buy = (card: Card) => {
+    const price = PRICE[card.rarity];
+    if (coins < price) return;
+    setCoins((c) => c - price);
+    setDeck((d) => [...d, card]);
+    setShopStock((s) => s.filter((c) => c.id !== card.id));
+    sound.found(3);
+  };
+
+  const reroll = () => {
+    if (coins < 2) return;
+    setCoins((c) => c - 2);
+    setShopStock(pickN(deck, 4));
+    sound.tap();
   };
 
   const cur = pathWord(path, board);
@@ -174,6 +213,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
       <button className="icon-btn menu-btn" aria-label="Exit" onClick={onExit}>
         ✕
       </button>
+      <div className="coins" key={coins}>🪙 {coins}</div>
 
       <header className="run-top">
         <div className="stat">
@@ -263,7 +303,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
       </div>
 
       {boardScore >= target && phase === "play" && (
-        <button className="btn primary next-btn" onClick={() => { setDraft(pick3(deck)); setPhase("draft"); }}>
+        <button className="btn primary next-btn" onClick={clearBoard}>
           Target hit — bank &amp; draft →
         </button>
       )}
@@ -279,7 +319,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
                 <button
                   key={c.id}
                   className={`rcard pick r-${c.rarity} k-${c.kind}`}
-                  onClick={() => (phase === "opening" ? openingPick(c) : nextBoard(c))}
+                  onClick={() => (phase === "opening" ? openingPick(c) : pickDraft(c))}
                 >
                   <b>{c.name}</b>
                   <span>{c.text}</span>
@@ -290,6 +330,41 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
             {phase === "opening" && (
               <div className="draft-sub">a fresh run — you'll draft the rest between boards</div>
             )}
+          </div>
+        </div>
+      )}
+
+      {phase === "shop" && (
+        <div className="menu-veil">
+          <div className="draft-card">
+            <div className="menu-title">Shop · 🪙 {coins}</div>
+            <div className="draft-row">
+              {shopStock.map((c) => {
+                const price = PRICE[c.rarity];
+                const afford = coins >= price;
+                return (
+                  <button
+                    key={c.id}
+                    className={`rcard pick r-${c.rarity} k-${c.kind}`}
+                    disabled={!afford}
+                    onClick={() => buy(c)}
+                  >
+                    <b>{c.name}</b>
+                    <span>{c.text}</span>
+                    <em className="r-tag">🪙 {price}</em>
+                  </button>
+                );
+              })}
+              {shopStock.length === 0 && <div className="draft-sub">sold out — nice haul</div>}
+            </div>
+            <div className="shop-actions">
+              <button className="btn" disabled={coins < 2} onClick={reroll}>
+                Reroll · 🪙 2
+              </button>
+              <button className="btn primary" onClick={advanceBoard}>
+                Continue →
+              </button>
+            </div>
           </div>
         </div>
       )}
