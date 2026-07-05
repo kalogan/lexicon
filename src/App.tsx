@@ -1,8 +1,8 @@
 /**
  * LEXICON — a stylish word-hunt puzzle (Boggle lineage), built on game-kit as a
- * kit-hardening vehicle. Flow: (tap-to-begin gate →) studio ident → title (mode
- * select) → a round on the letter grid → results. Each difficulty keeps its own
- * best score. THREE-free; the kit supplies the front door + determinism (prng).
+ * kit-hardening vehicle. Flow: tap-to-begin gate → studio ident → title (mode
+ * select) → a round on the letter grid → results (with a solver-revealed best
+ * possible word). Each difficulty keeps its own best score (kit `settings`).
  */
 import { useEffect, useState } from "react";
 import { StartGate, StudioIdent, TitleScreen } from "game-kit/title/r3f";
@@ -12,14 +12,9 @@ import { ResultsScreen } from "./ResultsScreen.js";
 import { loadDictionary } from "./dictionary.js";
 import { MODES, type Mode } from "./modes.js";
 import { sound } from "./sound.js";
+import * as store from "./store.js";
 
 type Phase = "gate" | "ident" | "title" | "play" | "results";
-
-const bestKey = (modeId: string) => `lexicon:best:${modeId}`;
-function loadBest(modeId: string): number {
-  const v = Number(localStorage.getItem(bestKey(modeId)));
-  return Number.isFinite(v) ? v : 0;
-}
 
 export function App() {
   const [phase, setPhase] = useState<Phase>("gate");
@@ -37,7 +32,7 @@ export function App() {
   const startRound = (m: Mode) => {
     setMode(m);
     setSeed(Date.now());
-    setBest(loadBest(m.id));
+    setBest(store.getBest(m.id));
     setResult(null);
     setIsNewBest(false);
     sound.begin();
@@ -45,14 +40,10 @@ export function App() {
   };
 
   const finishRound = (r: RoundResult) => {
-    const prev = loadBest(mode.id);
+    const prev = store.getBest(mode.id);
     const beat = r.score > prev;
-    if (beat) {
-      localStorage.setItem(bestKey(mode.id), String(r.score));
-      setBest(r.score);
-    } else {
-      setBest(prev);
-    }
+    store.setBest(mode.id, r.score); // raises only
+    setBest(Math.max(prev, r.score));
     setIsNewBest(beat && r.score > 0);
     setResult(r);
     sound.timeUp();
@@ -112,6 +103,8 @@ export function App() {
       best={best}
       isNewBest={isNewBest}
       modeLabel={mode.label}
+      seed={seed}
+      size={mode.size}
       onPlayAgain={() => startRound(mode)}
       onHome={() => setPhase("title")}
     />

@@ -34,8 +34,7 @@
  * in try/catch (private-mode / SSR safe).
  */
 
-/** localStorage key the mute preference persists under. */
-const MUTE_KEY = "lexicon:muted";
+import { getMuted as storeGetMuted, setMuted as storeSetMuted } from "./store.js";
 
 /** The subset of AudioContext the browser exposes (incl. webkit-prefixed). */
 type Ctor = typeof AudioContext;
@@ -50,21 +49,17 @@ function getAudioContextCtor(): Ctor | null {
   return w.AudioContext ?? w.webkitAudioContext ?? null;
 }
 
-/** Read the persisted mute flag; defaults to false and never throws. */
+/** Read the persisted mute flag (via the kit-settings-backed store). */
 function readMuted(): boolean {
-  try {
-    return typeof localStorage !== "undefined" && localStorage.getItem(MUTE_KEY) === "1";
-  } catch {
-    return false;
-  }
+  return storeGetMuted();
 }
 
-/** Persist the mute flag; silently ignores storage failures. */
+/** Persist the mute flag (via the store). */
 function writeMuted(muted: boolean): void {
   try {
-    if (typeof localStorage !== "undefined") localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
+    storeSetMuted(muted);
   } catch {
-    // Private mode / storage disabled — the in-memory flag still works.
+    // The in-memory flag still works even if persistence fails.
   }
 }
 
