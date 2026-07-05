@@ -741,6 +741,44 @@ body,
   padding: 5px 12px;
   font-size: 14px;
 }
+
+/* Relic inspector — tap a deck chip to read it + see its live accrued value */
+.inspect-card {
+  width: min(88vw, 340px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #fbf7ee;
+  border-radius: 22px;
+  padding: 20px;
+  box-shadow: 0 24px 70px rgba(20, 14, 30, 0.4);
+  animation: pop-in 0.28s ease;
+}
+.accrued {
+  text-align: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--lex-accent-deep);
+  background: rgba(217, 138, 61, 0.12);
+  border-radius: 12px;
+  padding: 9px 12px;
+}
+.accrued--none {
+  color: var(--lex-muted);
+  background: rgba(43, 36, 64, 0.05);
+  font-weight: 600;
+}
+/* Meta: deepest-run stat on the dead screen */
+.depth-stat {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--lex-muted);
+  margin-top: 2px;
+}
+.depth-stat.record {
+  color: var(--lex-accent-deep);
+  animation: score-pop 0.4s ease;
+}
 .shop-actions {
   display: flex;
   gap: 10px;

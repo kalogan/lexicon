@@ -10,6 +10,8 @@
 import type { Card } from "./engine.js";
 import { EXTRA_CARDS } from "./cards-extra.js";
 import { EXTRA_CARDS2 } from "./cards-extra2.js";
+import { EXTRA_CARDS3 } from "./cards-extra3.js";
+import { EXTRA_CARDS4 } from "./cards-extra4.js";
 
 // ── Dictionaries (persistent) ────────────────────────────────────────────────
 
@@ -95,6 +97,7 @@ export const ALPHABET: Card = {
       ctx.trigger("Alphabet", "+25 (new letter)");
     }
   },
+  accrued: (run) => (run.seenFirst.size > 0 ? `${run.seenFirst.size}/26 starting letters used` : null),
 };
 
 export const TIME_DICT: Card = {
@@ -141,6 +144,7 @@ export const CHRONOLOGIST: Card = {
       ctx.trigger("Chronologist", "+5s, +0.5 mult (perm)");
     }
   },
+  accrued: (run) => (run.permaMult > 0 ? `+${run.permaMult.toFixed(1)}× permanent mult banked this run` : null),
 };
 
 /** Every card, for lookups. */
@@ -166,4 +170,6 @@ export const DRAFT_POOL: readonly Card[] = [
   ...ALL_CARDS.filter((c) => c.id !== "alphabet" && c.id !== "tiny"),
   ...EXTRA_CARDS,
   ...EXTRA_CARDS2,
+  ...EXTRA_CARDS3,
+  ...EXTRA_CARDS4,
 ];

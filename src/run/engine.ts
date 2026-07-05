@@ -67,6 +67,10 @@ export interface Card {
   text: string;
   /** Mutate the scoring context when this card's condition is met. */
   apply(ctx: ScoreCtx): void;
+  /** Optional: a live "so far this run" value for the tooltip — e.g. a permanent
+   *  mult or counter this relic has built up. Return null if nothing has accrued
+   *  (or omit for cards whose effect never accumulates). */
+  accrued?: (run: RunState) => string | null;
 }
 
 export interface Breakdown {

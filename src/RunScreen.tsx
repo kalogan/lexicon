@@ -25,7 +25,9 @@ function buzz(pattern: number | number[]) {
 
 const SIZE = 5;
 const TIME_BUDGET = 90;
-const targetFor = (board: number) => Math.round(100 * Math.pow(1.7, board - 1));
+// Target curve — eased from 1.7 to 1.45 so the mid-run wall (boards 4–6) is
+// reachable with a decent engine. board1≈100, 3≈210, 5≈442, 6(boss)≈641.
+const targetFor = (board: number) => Math.round(100 * Math.pow(1.45, board - 1));
 
 function cellAt(x: number, y: number): number {
   const cell = document.elementFromPoint(x, y)?.closest("[data-cell]");
@@ -93,6 +95,11 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const [fly, setFly] = useState<{ id: number; total: number } | null>(null);
   const [boss, setBoss] = useState<Boss | null>(null);
   const blocked = useMemo(() => new Set(boss?.blocked?.(SIZE, boardSeed) ?? []), [boss, boardSeed]);
+  // Tap a relic to inspect it (rules + live accrued value).
+  const [inspect, setInspect] = useState<Card | null>(null);
+  // Meta: deepest board ever reached (persists across runs).
+  const bestDepth = useRef(Number(localStorage.getItem("lexicon:bestDepth") ?? 0));
+  const [newRecord, setNewRecord] = useState(false);
   const tracing = useRef(false);
   const target = targetFor(boardIdx);
   const ready = dict !== null;
@@ -115,8 +122,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
       if (boardScore >= target) {
         clearBoard();
       } else {
-        setPhase("dead");
-        sound.timeUp();
+        die();
       }
       return;
     }
@@ -173,10 +179,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
       const survived = boardScore + b.total >= target;
       window.setTimeout(() => {
         if (survived) clearBoard();
-        else {
-          setPhase("dead");
-          sound.timeUp();
-        }
+        else die();
       }, 1300);
     }
   };
@@ -197,6 +200,17 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setFound(new Set());
     setRun((r) => ({ ...r, board: r.board + 1, boardWords: 0, lastFirst: null }));
     setPhase("play");
+  };
+
+  // Death — record how deep this run got (meta progress) before the dead screen.
+  const die = () => {
+    if (boardIdx > bestDepth.current) {
+      bestDepth.current = boardIdx;
+      localStorage.setItem("lexicon:bestDepth", String(boardIdx));
+      setNewRecord(true);
+    }
+    setPhase("dead");
+    sound.timeUp();
   };
 
   // Beating a board: bank coins (base + interest, Balatro-style), a calm chime,
@@ -241,6 +255,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const preview =
     cur.length >= MIN_WORD_LEN && dict && dict.has(cur) && !found.has(cur) ? scoreWord(cur, deck, run) : null;
   const pct = Math.min(100, Math.round((boardScore / target) * 100));
+  const inspectAccrued = inspect?.accrued?.(run) ?? null;
 
   return (
     <div className="run">
@@ -279,10 +294,10 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
 
       {/* Your relics — the engine you're building. They glow when they fire. */}
       <div className="deck-wrap">
-        <span className="deck-label">◈ your relics · {deck.length}</span>
+        <span className="deck-label">◈ your relics · {deck.length} · tap to inspect</span>
         <div className="deck">
           {deck.map((c, i) => (
-            <RelicCard key={c.id + i} card={c} mode="chip" flash={flash.has(c.name)} />
+            <RelicCard key={c.id + i} card={c} mode="chip" flash={flash.has(c.name)} onClick={() => setInspect(c)} />
           ))}
         </div>
       </div>
@@ -407,12 +422,32 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
         </div>
       )}
 
+      {/* Relic inspector — tap a deck chip to see its rules + live accrued value */}
+      {inspect && (
+        <div className="menu-veil" onClick={() => setInspect(null)}>
+          <div className="inspect-card" onClick={(e) => e.stopPropagation()}>
+            <RelicCard card={inspect} mode="full" />
+            {inspectAccrued ? (
+              <div className="accrued">📈 {inspectAccrued}</div>
+            ) : (
+              <div className="accrued accrued--none">no bonus banked yet this run</div>
+            )}
+            <button className="btn primary" onClick={() => setInspect(null)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       {phase === "dead" && (
         <div className="menu-veil">
           <div className="menu-card">
             <div className="menu-title">Run over</div>
             <div className="results-score">{runScore}</div>
             <div className="results-sub">reached board {boardIdx} · {deck.length} cards</div>
+            <div className={`depth-stat${newRecord ? " record" : ""}`}>
+              {newRecord ? `★ new record — board ${bestDepth.current}` : `deepest run · board ${bestDepth.current}`}
+            </div>
             <button className="btn primary" onClick={onExit}>Back to menu</button>
           </div>
         </div>
