@@ -35,6 +35,7 @@ import {
 import { challengeBoss, type Boss } from "./run/bosses.js";
 import { challengeModifier, goldCell, type BoardMod } from "./run/modifiers.js";
 import { STAKES, stakeRules, stakeAt, clampStake } from "./run/stakes.js";
+import { unlockedRelicIds } from "./run/unlocks.js";
 import { STARTER_CHARM, randomCharm, type Charm } from "./run/charms.js";
 import { RelicCard } from "./RelicCard.js";
 import * as meta from "./meta.js";
@@ -90,14 +91,14 @@ function commit(run: RunState, b: Breakdown, deck: readonly Card[]): RunState {
   };
 }
 
-function pickRelics(n = 3): ShopRelic[] {
+function pickRelics(pool: readonly Card[], n = 3): ShopRelic[] {
   const out: ShopRelic[] = [];
   const used = new Set<number>();
-  while (out.length < n && used.size < DRAFT_POOL.length) {
-    const i = Math.floor(Math.random() * DRAFT_POOL.length);
+  while (out.length < n && used.size < pool.length) {
+    const i = Math.floor(Math.random() * pool.length);
     if (used.has(i)) continue;
     used.add(i);
-    const card = DRAFT_POOL[i]!;
+    const card = pool[i]!;
     out.push({ card, price: PRICE[card.rarity] });
   }
   return out;
@@ -130,18 +131,31 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   // first-timers skip straight to the draft at Stake I.
   const [stake, setStake] = useState(() => clampStake(meta.getStats().topStakeUnlocked));
   const [phase, setPhase] = useState<
-    "stake" | "draft" | "draftRelic" | "intro" | "play" | "shop" | "won" | "lost"
-  >(() => (meta.getStats().topStakeUnlocked > 1 ? "stake" : "draft"));
+    "howto" | "stake" | "draft" | "draftRelic" | "intro" | "play" | "shop" | "won" | "lost"
+  >(() =>
+    !meta.hasFlag("challenge-howto")
+      ? "howto"
+      : meta.getStats().topStakeUnlocked > 1
+        ? "stake"
+        : "draft",
+  );
   // Opening draft: choose 5 of 10 offered letters to add to the base deck.
   const [offer] = useState(() => letterOffer(10));
   const [picked, setPicked] = useState<Set<number>>(() => new Set());
+  // Relic pool available this run — legendaries gate in via lifetime unlocks.
+  const [pool] = useState<readonly Card[]>(() => {
+    const ids = unlockedRelicIds(meta.getStats());
+    return DRAFT_POOL.filter((c) => ids.has(c.id));
+  });
   // Opening draft: choose 1 of 3 relics to seed your engine.
-  const [relicOffer] = useState(() => pickRelics(3).map((r) => r.card));
+  const [relicOffer] = useState(() => pickRelics(pool, 3).map((r) => r.card));
 
   const [boardSeed, setBoardSeed] = useState(() => Date.now());
   const board = useMemo(() => makeBoardFromDeck(letters, boardSeed, SIZE), [letters, boardSeed]);
   const [boardScore, setBoardScore] = useState(0);
   const [run, setRun] = useState<RunState>(() => makeRunState());
+  // Best single word this run (for the post-run recap).
+  const [bestWord, setBestWord] = useState<{ word: string; score: number } | null>(null);
   const [playsLeft, setPlaysLeft] = useState(PLAYS_PER_BLIND);
   const [discardsLeft, setDiscardsLeft] = useState(DISCARDS_PER_BLIND);
   const [path, setPath] = useState<number[]>([]);
@@ -337,7 +351,7 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
       setCharmToast(msg);
       window.setTimeout(() => setCharmToast((m) => (m === msg ? null : m)), 1800);
     }
-    setShopStock(pickRelics());
+    setShopStock(pickRelics(pool));
     setCharmStock(pickCharms());
     setPhase("shop");
   };
@@ -401,6 +415,7 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     const b: Breakdown = { ...raw, total, triggers };
     setFound((f) => new Set(f).add(word));
     setBoardScore((s) => s + total);
+    setBestWord((bw) => (!bw || total > bw.score ? { word, score: total } : bw));
     setRun((r) => commit(r, b, effectiveDeck));
     setToast(b);
     window.setTimeout(() => setToast((t) => (t === b ? null : t)), 1400);
@@ -532,7 +547,7 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   const reroll = () => {
     if (coins < REROLL_COST) return;
     setCoins((c) => c - REROLL_COST);
-    setShopStock(pickRelics());
+    setShopStock(pickRelics(pool));
     setCharmStock(pickCharms());
     sound.tap();
   };
@@ -545,6 +560,42 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   const inspectAccrued = inspect?.accrued?.(run) ?? null;
 
   // ── Overlays ─────────────────────────────────────────────────────────────────
+  if (phase === "howto") {
+    const afterHowto = () => {
+      meta.setFlag("challenge-howto");
+      setPhase(meta.getStats().topStakeUnlocked > 1 ? "stake" : "draft");
+    };
+    return (
+      <div className="menu-veil">
+        <div className="ldraft-card">
+          <div className="menu-title">How Challenge works</div>
+          <ul className="howto-list">
+            <li>
+              <b>Climb 5 antes</b> — each is three blinds (Small · Big · Boss). Hit each score target to
+              advance; clear the final Boss to <b>win</b>.
+            </li>
+            <li>
+              <b>6 plays + 3 fresh boards</b> per blind. Your board is dealt from <b>your letter deck</b> —
+              shape it in the shop.
+            </li>
+            <li>
+              <b>Relics</b> are your scoring engine and they stack. <b>Charms</b> are one-shot boosts you tap
+              mid-blind.
+            </li>
+            <li>
+              <b>Boss blinds</b> add a rule to play around; some blinds roll a <b>twist</b> that helps you.
+            </li>
+            <li>
+              Between blinds, <b>shop</b> for relics, charms, and letter-deck tweaks.
+            </li>
+          </ul>
+          <button className="btn primary" onClick={afterHowto}>
+            Got it →
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (phase === "stake") {
     const unlocked = meta.getStats().topStakeUnlocked;
     const sel = stakeAt(stake);
@@ -652,6 +703,12 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
       />
     );
   }
+  const recap = {
+    bestWord: bestWord?.word ?? null,
+    bestWordScore: bestWord?.score ?? 0,
+    words: run.runWords,
+    peakMult: run.permaMult,
+  };
   if (phase === "won") {
     return (
       <ChallengeWin
@@ -659,11 +716,12 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
         onExit={onExit}
         stakeName={stakeAt(stake).name}
         nextStakeName={stake < STAKES.length ? stakeAt(stake + 1).name : null}
+        recap={recap}
       />
     );
   }
   if (phase === "lost") {
-    return <ChallengeLost blind={blind} onExit={onExit} />;
+    return <ChallengeLost blind={blind} onExit={onExit} recap={recap} />;
   }
   if (phase === "shop") {
     return (

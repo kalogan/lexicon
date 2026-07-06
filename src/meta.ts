@@ -62,6 +62,8 @@ interface Store {
    *  (namespaced — "relic:<id>", "charm:<id>", "mod:<id>", "boss:<id>"). The
    *  Codex shows only seen content in full; the rest reads as a locked silhouette. */
   seen: string[];
+  /** One-time flags (e.g. "challenge-howto" once the Challenge intro is dismissed). */
+  flags: string[];
 }
 
 function read(): Store {
@@ -69,7 +71,12 @@ function read(): Store {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as Partial<Store>;
-      return { stats: { ...ZERO, ...(s.stats ?? {}) }, unlocked: s.unlocked ?? [], seen: s.seen ?? [] };
+      return {
+        stats: { ...ZERO, ...(s.stats ?? {}) },
+        unlocked: s.unlocked ?? [],
+        seen: s.seen ?? [],
+        flags: s.flags ?? [],
+      };
     }
   } catch {
     /* fall through to a fresh store */
@@ -81,7 +88,7 @@ function read(): Store {
   } catch {
     /* ignore */
   }
-  return { stats: { ...ZERO, bestDepth }, unlocked: [], seen: [] };
+  return { stats: { ...ZERO, bestDepth }, unlocked: [], seen: [], flags: [] };
 }
 
 function write(store: Store): void {
@@ -103,6 +110,19 @@ export function getUnlocked(): Set<string> {
 /** The set of encountered content keys (for Codex discovery gating). */
 export function getSeen(): Set<string> {
   return new Set(read().seen);
+}
+
+/** Whether a one-time flag has been set (e.g. an intro already dismissed). */
+export function hasFlag(id: string): boolean {
+  return read().flags.includes(id);
+}
+
+/** Set a one-time flag (idempotent). */
+export function setFlag(id: string): void {
+  const s = read();
+  if (s.flags.includes(id)) return;
+  s.flags = [...s.flags, id];
+  write(s);
 }
 
 /** Mark content keys ENCOUNTERED. Namespaced keys ("relic:tiny", "boss:echo",

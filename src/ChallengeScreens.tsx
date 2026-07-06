@@ -17,6 +17,33 @@
 import type { JSX } from "react";
 import type { Blind } from "./run/challenge.js";
 
+/** A compact end-of-run summary shown on the win/lose screens. */
+export interface Recap {
+  bestWord: string | null;
+  bestWordScore: number;
+  words: number;
+  peakMult: number;
+}
+
+function RecapList({ recap }: { recap: Recap }): JSX.Element {
+  return (
+    <dl className="recap">
+      <div className="recap-row">
+        <dt>Best word</dt>
+        <dd>{recap.bestWord ? `${recap.bestWord.toUpperCase()} · ${recap.bestWordScore}` : "—"}</dd>
+      </div>
+      <div className="recap-row">
+        <dt>Words played</dt>
+        <dd>{recap.words}</dd>
+      </div>
+      <div className="recap-row">
+        <dt>Peak mult</dt>
+        <dd>×{(1 + recap.peakMult).toFixed(1)}</dd>
+      </div>
+    </dl>
+  );
+}
+
 /* ── AnteBanner ──────────────────────────────────────────────────────────────
  * The punchy "next blind" card. Ante eyebrow, the blind name big, a boss flag +
  * danger treatment when it's a boss, the target shown large, and a Begin CTA.
@@ -77,8 +104,9 @@ export function ChallengeWin(props: {
   stakeName?: string;
   /** The next stake this win unlocked, if any. */
   nextStakeName?: string | null;
+  recap?: Recap;
 }): JSX.Element {
-  const { coins, onExit, stakeName, nextStakeName } = props;
+  const { coins, onExit, stakeName, nextStakeName, recap } = props;
   return (
     <div className="menu-veil">
       <ChallengeStyles />
@@ -98,6 +126,8 @@ export function ChallengeWin(props: {
           <span className="cs-coins-num">{coins.toLocaleString()}</span>
         </div>
 
+        {recap && <RecapList recap={recap} />}
+
         <button type="button" className="btn primary cs-cta" onClick={onExit} autoFocus>
           Back to title
         </button>
@@ -109,8 +139,8 @@ export function ChallengeWin(props: {
 /* ── ChallengeLost ───────────────────────────────────────────────────────────
  * Defeat — a target was missed. Gentle, encouraging, not punishing.
  */
-export function ChallengeLost(props: { blind: Blind; onExit: () => void }): JSX.Element {
-  const { blind, onExit } = props;
+export function ChallengeLost(props: { blind: Blind; onExit: () => void; recap?: Recap }): JSX.Element {
+  const { blind, onExit, recap } = props;
   return (
     <div className="menu-veil">
       <ChallengeStyles />
@@ -128,6 +158,8 @@ export function ChallengeLost(props: { blind: Blind; onExit: () => void }): JSX.
         <p className="cs-lost-line">
           The {blind.name} held. Build a deeper deck and try again.
         </p>
+
+        {recap && <RecapList recap={recap} />}
 
         <button type="button" className="btn cs-cta" onClick={onExit} autoFocus>
           Back to title

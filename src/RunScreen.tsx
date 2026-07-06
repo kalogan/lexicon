@@ -10,6 +10,7 @@ import { makeBoard, canExtend, pathWord, MIN_WORD_LEN, type Board } from "./boar
 import { readyDictionary, loadDictionary, type Dictionary } from "./dictionary.js";
 import { scoreWord, makeRunState, type RunState, type Card, type Breakdown } from "./run/engine.js";
 import { STARTER_DECK, TUTORIAL_DECK, DRAFT_POOL } from "./run/cards.js";
+import { unlockedRelicIds } from "./run/unlocks.js";
 import { randomBoss, type Boss } from "./run/bosses.js";
 import { randomModifier, goldCell, type BoardMod } from "./run/modifiers.js";
 import { STARTER_CHARM, randomCharm, type Charm } from "./run/charms.js";
@@ -66,11 +67,10 @@ function commit(run: RunState, b: Breakdown, deck: readonly Card[]): RunState {
   };
 }
 
-function pickN(n = 3): Card[] {
-  // Draw from the FULL pool every time — relics can repeat across drafts, so you
+function pickN(src: readonly Card[], n = 3): Card[] {
+  // Draw from the given pool every time — relics can repeat across drafts, so you
   // can STACK copies of the same relic (each copy fires). Still distinct within a
   // single offering (no "choose between 3 identical").
-  const src = DRAFT_POOL;
   const out: Card[] = [];
   const used = new Set<number>();
   while (out.length < n && used.size < src.length) {
@@ -109,6 +109,8 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   );
   const [boardScore, setBoardScore] = useState(0);
   const [runScore, setRunScore] = useState(0);
+  // Best single word this run (for the post-run recap).
+  const [bestWord, setBestWord] = useState<{ word: string; score: number } | null>(null);
   const [timeLeft, setTimeLeft] = useState(() => TIME_BUDGET + (boardMod?.startTimeBonus ?? 0));
   // Hands: word-plays left this board (the primary limiter) + board reshuffles.
   const [playsLeft, setPlaysLeft] = useState(PLAYS_PER_BOARD);
@@ -119,7 +121,12 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const [phase, setPhase] = useState<"opening" | "play" | "draft" | "shop" | "dead">(() =>
     firstRun.current ? "play" : "opening",
   );
-  const [draft, setDraft] = useState<Card[]>(() => (firstRun.current ? [] : pickN()));
+  // Relic pool for this run — legendaries gate in via lifetime unlocks.
+  const [pool] = useState<readonly Card[]>(() => {
+    const ids = unlockedRelicIds(meta.getStats());
+    return DRAFT_POOL.filter((c) => ids.has(c.id));
+  });
+  const [draft, setDraft] = useState<Card[]>(() => (firstRun.current ? [] : pickN(pool)));
   const [coins, setCoins] = useState(0);
   const [shopStock, setShopStock] = useState<Card[]>([]);
   const [toast, setToast] = useState<Breakdown | null>(null);
@@ -290,6 +297,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setFound((f) => new Set(f).add(word));
     setBoardScore((s) => s + total);
     setRunScore((s) => s + total);
+    setBestWord((bw) => (!bw || total > bw.score ? { word, score: total } : bw));
     setTimeLeft((t) => t + b.timeGain);
     setRun((r) => commit(r, b, effectiveDeck));
     setToast(b);
@@ -448,7 +456,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
       window.setTimeout(() => setCharmToast((m) => (m === msg ? null : m)), 1800);
     }
     setBoss(null);
-    setDraft(pickN());
+    setDraft(pickN(pool));
     setPhase("draft");
   };
 
@@ -457,7 +465,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     const next = [...deck, card];
     setDeck(next);
     if (boardIdx % 3 === 0) {
-      setShopStock(pickN(4));
+      setShopStock(pickN(pool, 4));
       setPhase("shop");
     } else {
       advanceBoard();
@@ -476,7 +484,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const reroll = () => {
     if (coins < 2) return;
     setCoins((c) => c - 2);
-    setShopStock(pickN(4));
+    setShopStock(pickN(pool, 4));
     sound.tap();
   };
 
@@ -788,6 +796,20 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
             <div className={`depth-stat${newRecord ? " record" : ""}`}>
               {newRecord ? `★ new record — board ${bestDepth.current}` : `deepest run · board ${bestDepth.current}`}
             </div>
+            <dl className="recap">
+              <div className="recap-row">
+                <dt>Best word</dt>
+                <dd>{bestWord ? `${bestWord.word.toUpperCase()} · ${bestWord.score}` : "—"}</dd>
+              </div>
+              <div className="recap-row">
+                <dt>Words played</dt>
+                <dd>{run.runWords}</dd>
+              </div>
+              <div className="recap-row">
+                <dt>Peak mult</dt>
+                <dd>×{(1 + run.permaMult).toFixed(1)}</dd>
+              </div>
+            </dl>
             <button className="btn primary" onClick={onExit}>Back to menu</button>
           </div>
         </div>
