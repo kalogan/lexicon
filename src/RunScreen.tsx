@@ -588,7 +588,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
         )}
       </div>
 
-      <div className="board-wrap" style={{ width: "min(92vw, 420px, calc(100svh - 400px))" }}>
+      <div className="board-wrap" style={{ width: "min(var(--run-w, 92vw), 520px, calc(100svh - 380px))" }}>
         <div
           className={`board${transmute && transmute.target === null ? " transmuting" : ""}`}
           style={{ gridTemplateColumns: `repeat(${SIZE}, 1fr)` }}

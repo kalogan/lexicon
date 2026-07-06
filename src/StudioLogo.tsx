@@ -12,6 +12,7 @@
  * since LEXICON has no tap-gate), but plays on later visits once the browser lets
  * audio start — the same behaviour as CHIMERA.
  */
+import { useEffect } from "react";
 import { StudioIdent } from "game-kit/title/r3f";
 import { sound } from "./sound.js";
 import "./studio-logo.css";
@@ -63,6 +64,14 @@ function WovenwildArt() {
 }
 
 export function StudioLogo({ onDone }: { onDone: () => void }) {
+  // A "thwup" in sync with the tongue flick + eye squint (~2.55s into the CSS
+  // beat, matching the studioTongue/studioSquint keyframes). The kit's onCue is
+  // already spent on the eye-open chime, so we time this one ourselves.
+  useEffect(() => {
+    const id = window.setTimeout(() => sound.thwup(), 2550);
+    return () => window.clearTimeout(id);
+  }, []);
+
   return (
     <StudioIdent
       wordmark="WOVENWILD"

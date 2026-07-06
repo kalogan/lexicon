@@ -335,6 +335,17 @@ class SoundManager {
     this.tone({ wave: "sine", freq: 987.77, gain: 0.07, attack: 0.012, duration: 0.5 }); // B5
     this.tone({ wave: "sine", freq: 1318.51, gain: 0.05, delay: 0.13, attack: 0.012, duration: 0.6 }); // E6
   }
+
+  /**
+   * thwup — the frog's tongue flick: a quick, soft, wet pop. A fast downward
+   * pitch glide with a snappy envelope, layered with a higher click for the
+   * "wet" edge. Meant to land in sync with the tongue animation.
+   */
+  thwup(): void {
+    if (!this.ready()) return;
+    this.tone({ wave: "triangle", freq: [640, 150], gain: 0.15, attack: 0.002, duration: 0.12 });
+    this.tone({ wave: "sine", freq: [1150, 320], gain: 0.07, attack: 0.001, duration: 0.08 });
+  }
 }
 
 /** The shared singleton — import and call anywhere; safe before `unlock()`. */
