@@ -33,6 +33,7 @@ import {
   type Blind,
 } from "./run/challenge.js";
 import { challengeBoss, type Boss } from "./run/bosses.js";
+import { challengeModifier, goldCell, type BoardMod } from "./run/modifiers.js";
 import { STARTER_CHARM, randomCharm, type Charm } from "./run/charms.js";
 import { RelicCard } from "./RelicCard.js";
 import * as meta from "./meta.js";
@@ -178,6 +179,23 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     () => new Set(sealsCleared ? [] : boss?.blocked?.(SIZE, boardSeed) ?? []),
     [boss, boardSeed, sealsCleared],
   );
+  // Regular (non-boss) blinds can roll a scoring twist. Stable per blind within a
+  // run; a boss blind never carries one (the boss takes the slot).
+  const boardMod: BoardMod | null = useMemo(
+    () => (blind.isBoss ? null : challengeModifier(blind.step ^ runSalt)),
+    [blind.isBoss, blind.step, runSalt],
+  );
+  // The modifier's transient scoring card rides along with the relics this blind only.
+  const effectiveDeck = useMemo(
+    () => (boardMod?.card ? [...relics, boardMod.card] : relics),
+    [relics, boardMod],
+  );
+  // Gold tile: a modifier can light one cell; a word tracing it scores ×goldMult.
+  const goldTile = useMemo(
+    () => (boardMod?.goldTile ? goldCell(SIZE, boardSeed, blocked) : -1),
+    [boardMod, boardSeed, blocked],
+  );
+  const goldMult = boardMod?.goldMult ?? 2;
   // The board the player actually spells on: deck letters with Transmute overrides.
   const effBoard: Board = useMemo(() => {
     if (Object.keys(overrides).length === 0) return board;
@@ -224,8 +242,29 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   // Relic-ownership achievements (full-house / curator / stacking) as relics change.
   useEffect(() => {
     notifyAch(meta.recordDeck(relics.map((c) => c.id)));
+    meta.markSeen(relics.map((c) => `relic:${c.id}`));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [relics]);
+
+  // Codex discovery gating: mark content SEEN as it's offered or becomes active.
+  useEffect(() => {
+    meta.markSeen(relicOffer.map((c) => `relic:${c.id}`));
+  }, [relicOffer]);
+  useEffect(() => {
+    meta.markSeen(shopStock.map((e) => `relic:${e.card.id}`));
+  }, [shopStock]);
+  useEffect(() => {
+    meta.markSeen(charms.map((c) => `charm:${c.id}`));
+  }, [charms]);
+  useEffect(() => {
+    meta.markSeen(charmStock.map((e) => `charm:${e.charm.id}`));
+  }, [charmStock]);
+  useEffect(() => {
+    if (boss) meta.markSeen([`boss:${boss.id}`]);
+  }, [boss]);
+  useEffect(() => {
+    if (boardMod) meta.markSeen([`mod:${boardMod.id}`]);
+  }, [boardMod]);
 
   // Opening draft → add the 5 chosen letters, then on to the relic pick.
   const confirmDraft = () => {
@@ -330,9 +369,14 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
       buzz([0, 22, 40, 22]);
       return;
     }
-    const raw = scoreWord(word, relics, run);
+    const raw = scoreWord(word, effectiveDeck, run);
     const triggers = [...raw.triggers];
     let total = raw.total;
+    // Gold tile: a word tracing through the lit cell scores ×goldMult this blind.
+    if (goldTile >= 0 && cur.includes(goldTile)) {
+      total = Math.round(total * goldMult);
+      triggers.push({ card: "Golden Tile", detail: `×${goldMult}` });
+    }
     // Spotlight/Limelight charm: this word (only) scores ×2, then it's spent.
     if (doubleNext) {
       total *= 2;
@@ -342,7 +386,7 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     const b: Breakdown = { ...raw, total, triggers };
     setFound((f) => new Set(f).add(word));
     setBoardScore((s) => s + total);
-    setRun((r) => commit(r, b, relics));
+    setRun((r) => commit(r, b, effectiveDeck));
     setToast(b);
     window.setTimeout(() => setToast((t) => (t === b ? null : t)), 1400);
     setFlash(new Set(b.triggers.map((t) => t.card)));
@@ -480,7 +524,9 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
 
   const cur = pathWord(path, effBoard);
   const preview =
-    cur.length >= MIN_WORD_LEN && dict && dict.has(cur) && !found.has(cur) ? scoreWord(cur, relics, run) : null;
+    cur.length >= MIN_WORD_LEN && dict && dict.has(cur) && !found.has(cur)
+      ? scoreWord(cur, effectiveDeck, run)
+      : null;
   const inspectAccrued = inspect?.accrued?.(run) ?? null;
 
   // ── Overlays ─────────────────────────────────────────────────────────────────
@@ -638,6 +684,15 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
         </div>
       )}
 
+      {boardMod && phase === "play" && (
+        <div className={`mod-banner mod-${boardMod.tone}`}>
+          <span className="mod-name">
+            {boardMod.tone === "boon" ? "✦" : "✧"} {boardMod.name}
+          </span>
+          <span className="mod-blurb">{boardMod.blurb}</span>
+        </div>
+      )}
+
       {/* Charms — one-shot consumables. Tap to fire (spends it). */}
       {charms.length > 0 && (
         <div className="charm-tray">
@@ -727,11 +782,12 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
             const order = path.indexOf(i);
             const isBlocked = blocked.has(i);
             const isMorphed = overrides[i] !== undefined;
+            const isGold = i === goldTile;
             return (
               <div
                 key={i}
                 data-cell={i}
-                className={`tile${order >= 0 ? " on" : ""}${order === path.length - 1 ? " head" : ""}${isBlocked ? " blocked" : ""}${isMorphed ? " morphed" : ""}`}
+                className={`tile${order >= 0 ? " on" : ""}${order === path.length - 1 ? " head" : ""}${isBlocked ? " blocked" : ""}${isGold ? " gold" : ""}${isMorphed ? " morphed" : ""}`}
                 style={{ ["--i" as string]: i }}
               >
                 {isBlocked ? "" : c.label}

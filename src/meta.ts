@@ -50,6 +50,10 @@ const ZERO: Stats = {
 interface Store {
   stats: Stats;
   unlocked: string[];
+  /** Discovery gating: keys of content the player has ENCOUNTERED in a run
+   *  (namespaced — "relic:<id>", "charm:<id>", "mod:<id>", "boss:<id>"). The
+   *  Codex shows only seen content in full; the rest reads as a locked silhouette. */
+  seen: string[];
 }
 
 function read(): Store {
@@ -57,7 +61,7 @@ function read(): Store {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as Partial<Store>;
-      return { stats: { ...ZERO, ...(s.stats ?? {}) }, unlocked: s.unlocked ?? [] };
+      return { stats: { ...ZERO, ...(s.stats ?? {}) }, unlocked: s.unlocked ?? [], seen: s.seen ?? [] };
     }
   } catch {
     /* fall through to a fresh store */
@@ -69,7 +73,7 @@ function read(): Store {
   } catch {
     /* ignore */
   }
-  return { stats: { ...ZERO, bestDepth }, unlocked: [] };
+  return { stats: { ...ZERO, bestDepth }, unlocked: [], seen: [] };
 }
 
 function write(store: Store): void {
@@ -86,6 +90,30 @@ export function getStats(): Stats {
 
 export function getUnlocked(): Set<string> {
   return new Set(read().unlocked);
+}
+
+/** The set of encountered content keys (for Codex discovery gating). */
+export function getSeen(): Set<string> {
+  return new Set(read().seen);
+}
+
+/** Mark content keys ENCOUNTERED. Namespaced keys ("relic:tiny", "boss:echo",
+ *  "mod:rare-air", "charm:charm-spotlight"). Idempotent; writes only on change. */
+export function markSeen(keys: readonly string[]): void {
+  if (keys.length === 0) return;
+  const s = read();
+  const have = new Set(s.seen);
+  let changed = false;
+  for (const k of keys) {
+    if (!have.has(k)) {
+      have.add(k);
+      changed = true;
+    }
+  }
+  if (changed) {
+    s.seen = [...have];
+    write(s);
+  }
 }
 
 export interface Achievement {

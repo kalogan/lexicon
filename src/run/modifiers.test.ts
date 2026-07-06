@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { MODIFIERS, randomModifier, goldCell, type BoardMod } from "./modifiers.js";
+import {
+  MODIFIERS,
+  CHALLENGE_MODIFIERS,
+  randomModifier,
+  challengeModifier,
+  goldCell,
+  type BoardMod,
+} from "./modifiers.js";
 import { scoreWord, makeRunState, type Card } from "./engine.js";
 
 const ids = new Set(MODIFIERS.map((m) => m.id));
@@ -31,6 +38,26 @@ describe("randomModifier", () => {
     for (let seed = 0; seed < 300; seed++) {
       const m = randomModifier(seed);
       if (m !== null) expect(ids.has(m.id)).toBe(true);
+    }
+  });
+});
+
+describe("CHALLENGE_MODIFIERS / challengeModifier", () => {
+  it("excludes the time-only modifiers (Challenge has no clock)", () => {
+    const cids = new Set(CHALLENGE_MODIFIERS.map((m) => m.id));
+    for (const timeOnly of ["tailwind", "double-time", "slow-burn"]) {
+      expect(cids.has(timeOnly)).toBe(false);
+    }
+    // Nothing left grants time without also scoring: no bare startTimeBonus.
+    for (const m of CHALLENGE_MODIFIERS) expect(m.startTimeBonus).toBeUndefined();
+  });
+
+  it("only ever returns a member of CHALLENGE_MODIFIERS, deterministically", () => {
+    const cids = new Set(CHALLENGE_MODIFIERS.map((m) => m.id));
+    for (let seed = 0; seed < 300; seed++) {
+      const m = challengeModifier(seed);
+      expect(challengeModifier(seed)).toEqual(m); // deterministic
+      if (m !== null) expect(cids.has(m.id)).toBe(true);
     }
   });
 });

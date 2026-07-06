@@ -21,7 +21,7 @@ import { MODIFIERS, type BoardMod } from "./run/modifiers.js";
 import { BOSSES } from "./run/bosses.js";
 import { CHARMS, type Charm } from "./run/charms.js";
 import type { Card, Rarity } from "./run/engine.js";
-import { getStats, getUnlocked, ACHIEVEMENTS } from "./meta.js";
+import { getStats, getUnlocked, getSeen, ACHIEVEMENTS } from "./meta.js";
 
 /** Legendary leads, then rare → uncommon → common; ties broken by name. */
 const RARITY_ORDER: Record<Rarity, number> = {
@@ -125,86 +125,130 @@ export function Codex({ onExit }: { onExit: () => void }) {
 }
 
 /* ── Collection tab ───────────────────────────────────────────────────────────
- * The original Codex content, verbatim. Reuses `.codex-scroll` for its scroll.
+ * Discovery-gated (Balatro-style): only content you've ENCOUNTERED in a run shows
+ * in full; the rest reads as a locked "?" silhouette. Section counts show your
+ * progress (discovered / total).
  */
+function LockedCard() {
+  return (
+    <div className="codex-locked" aria-label="Undiscovered — find it in a run">
+      <span className="codex-locked-mark" aria-hidden="true">
+        ?
+      </span>
+      <span className="codex-locked-label">Undiscovered</span>
+    </div>
+  );
+}
+
 function CollectionTab({ relics, charms }: { relics: Card[]; charms: Charm[] }) {
+  const seen = getSeen();
+  const relicSeen = (c: Card) => seen.has(`relic:${c.id}`);
+  const modSeen = (m: BoardMod) => seen.has(`mod:${m.id}`);
+  const charmSeen = (c: Charm) => seen.has(`charm:${c.id}`);
+  const bossSeen = (b: { id: string }) => seen.has(`boss:${b.id}`);
+  const tally = <T,>(arr: readonly T[], pred: (x: T) => boolean) => arr.filter(pred).length;
+
   return (
     <div className="codex-scroll">
       {/* ── Relics ── */}
       <section className="codex-section">
         <h2 className="codex-section-title">
-          Relics <span className="codex-count">{relics.length}</span>
+          Relics{" "}
+          <span className="codex-count">
+            {tally(relics, relicSeen)} / {relics.length}
+          </span>
         </h2>
         <div className="codex-relic-grid">
-          {relics.map((c) => (
-            <RelicCard key={c.id} card={c} mode="full" />
-          ))}
+          {relics.map((c) =>
+            relicSeen(c) ? <RelicCard key={c.id} card={c} mode="full" /> : <LockedCard key={c.id} />,
+          )}
         </div>
       </section>
 
       {/* ── Board Modifiers ── */}
       <section className="codex-section">
         <h2 className="codex-section-title">
-          Board Modifiers <span className="codex-count">{MODIFIERS.length}</span>
+          Board Modifiers{" "}
+          <span className="codex-count">
+            {tally(MODIFIERS, modSeen)} / {MODIFIERS.length}
+          </span>
         </h2>
         <div className="codex-mod-grid">
-          {MODIFIERS.map((m) => (
-            <div key={m.id} className={`codex-mod codex-mod--${m.tone}`}>
-              <div className="codex-mod-top">
-                <span className="codex-mod-icon" aria-hidden="true">
-                  {modIcon(m)}
-                </span>
-                <span className="codex-mod-name">{m.name}</span>
-                <span className={`codex-tone codex-tone--${m.tone}`}>
-                  {m.tone === "boon" ? "BOON" : "TWIST"}
-                </span>
+          {MODIFIERS.map((m) =>
+            modSeen(m) ? (
+              <div key={m.id} className={`codex-mod codex-mod--${m.tone}`}>
+                <div className="codex-mod-top">
+                  <span className="codex-mod-icon" aria-hidden="true">
+                    {modIcon(m)}
+                  </span>
+                  <span className="codex-mod-name">{m.name}</span>
+                  <span className={`codex-tone codex-tone--${m.tone}`}>
+                    {m.tone === "boon" ? "BOON" : "TWIST"}
+                  </span>
+                </div>
+                <p className="codex-mod-blurb">{m.blurb}</p>
               </div>
-              <p className="codex-mod-blurb">{m.blurb}</p>
-            </div>
-          ))}
+            ) : (
+              <LockedCard key={m.id} />
+            ),
+          )}
         </div>
       </section>
 
       {/* ── Charms ── */}
       <section className="codex-section">
         <h2 className="codex-section-title">
-          Charms <span className="codex-count">{charms.length}</span>
+          Charms{" "}
+          <span className="codex-count">
+            {tally(charms, charmSeen)} / {charms.length}
+          </span>
         </h2>
         <div className="codex-mod-grid">
-          {charms.map((c) => (
-            <div key={c.id} className={`codex-mod codex-charm codex-charm--${c.rarity}`}>
-              <div className="codex-mod-top">
-                <span className="codex-mod-icon" aria-hidden="true">
-                  {charmIcon(c)}
-                </span>
-                <span className="codex-mod-name">{c.name}</span>
-                <span className={`codex-charm-rarity codex-charm-rarity--${c.rarity}`}>
-                  {RARITY_LABEL[c.rarity]}
-                </span>
+          {charms.map((c) =>
+            charmSeen(c) ? (
+              <div key={c.id} className={`codex-mod codex-charm codex-charm--${c.rarity}`}>
+                <div className="codex-mod-top">
+                  <span className="codex-mod-icon" aria-hidden="true">
+                    {charmIcon(c)}
+                  </span>
+                  <span className="codex-mod-name">{c.name}</span>
+                  <span className={`codex-charm-rarity codex-charm-rarity--${c.rarity}`}>
+                    {RARITY_LABEL[c.rarity]}
+                  </span>
+                </div>
+                <p className="codex-mod-blurb">{c.blurb}</p>
               </div>
-              <p className="codex-mod-blurb">{c.blurb}</p>
-            </div>
-          ))}
+            ) : (
+              <LockedCard key={c.id} />
+            ),
+          )}
         </div>
       </section>
 
       {/* ── Bosses ── */}
       <section className="codex-section">
         <h2 className="codex-section-title">
-          Bosses <span className="codex-count">{BOSSES.length}</span>
+          Bosses{" "}
+          <span className="codex-count">
+            {tally(BOSSES, bossSeen)} / {BOSSES.length}
+          </span>
         </h2>
         <div className="codex-boss-grid">
-          {BOSSES.map((b) => (
-            <div key={b.id} className="codex-boss">
-              <div className="codex-boss-top">
-                <span className="codex-boss-mark" aria-hidden="true">
-                  ☠
-                </span>
-                <span className="codex-boss-name">{b.name}</span>
+          {BOSSES.map((b) =>
+            bossSeen(b) ? (
+              <div key={b.id} className="codex-boss">
+                <div className="codex-boss-top">
+                  <span className="codex-boss-mark" aria-hidden="true">
+                    ☠
+                  </span>
+                  <span className="codex-boss-name">{b.name}</span>
+                </div>
+                <p className="codex-boss-blurb">{b.blurb}</p>
               </div>
-              <p className="codex-boss-blurb">{b.blurb}</p>
-            </div>
-          ))}
+            ) : (
+              <LockedCard key={b.id} />
+            ),
+          )}
         </div>
       </section>
     </div>
@@ -315,6 +359,35 @@ function CodexStyles() {
 }
 
 const CODEX_CSS = `
+/* ── Locked (undiscovered) silhouette ── */
+.codex-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 96px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px dashed rgba(43, 36, 64, 0.28);
+  background: rgba(43, 36, 64, 0.045);
+}
+.codex-locked-mark {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--lex-muted);
+  opacity: 0.5;
+}
+.codex-locked-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--lex-muted);
+  opacity: 0.7;
+}
+
 /* ── Charms ── */
 .codex-charm { border-top: 3px solid var(--charm-accent, var(--r-common)); }
 .codex-charm--common { --charm-accent: var(--r-common); }

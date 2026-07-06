@@ -227,6 +227,23 @@ export function randomModifier(seed: number): BoardMod | null {
   return MODIFIERS[rng.int(MODIFIERS.length)]!;
 }
 
+/** Modifiers whose ONLY effect is time — useless in Challenge (which has no clock). */
+const TIME_ONLY_MODS = new Set(["tailwind", "double-time", "slow-burn"]);
+
+/** Modifiers eligible in CHALLENGE mode: the scoring twists (gold tiles + chip/mult
+ *  cards). Time-only boons are dropped because Challenge is gated by plays, not time. */
+export const CHALLENGE_MODIFIERS: readonly BoardMod[] = MODIFIERS.filter(
+  (m) => !TIME_ONLY_MODS.has(m.id),
+);
+
+/** Roll a Challenge modifier for a REGULAR (non-boss) blind, deterministic by seed.
+ *  ~45% plain; otherwise a uniform pick among {@link CHALLENGE_MODIFIERS}. */
+export function challengeModifier(seed: number): BoardMod | null {
+  const rng = createRng(seed >>> 0);
+  if (rng.next() < 0.45) return null;
+  return CHALLENGE_MODIFIERS[rng.int(CHALLENGE_MODIFIERS.length)]!;
+}
+
 /** Deterministically pick one gold-tile cell index in [0, size*size), avoiding sealed
  *  cells. Returns -1 only if every cell is blocked (never happens in practice). */
 export function goldCell(size: number, seed: number, blocked: ReadonlySet<number>): number {

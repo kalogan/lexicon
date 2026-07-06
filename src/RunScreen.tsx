@@ -193,8 +193,26 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   // Relic-ownership achievements (full-house / stacking) as the deck changes.
   useEffect(() => {
     notifyAch(meta.recordDeck(deck.map((c) => c.id)));
+    meta.markSeen(deck.map((c) => `relic:${c.id}`));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deck]);
+
+  // Codex discovery gating: mark content SEEN as it's drafted, shopped, or active.
+  useEffect(() => {
+    meta.markSeen(draft.map((c) => `relic:${c.id}`));
+  }, [draft]);
+  useEffect(() => {
+    meta.markSeen(shopStock.map((c) => `relic:${c.id}`));
+  }, [shopStock]);
+  useEffect(() => {
+    meta.markSeen(charms.map((c) => `charm:${c.id}`));
+  }, [charms]);
+  useEffect(() => {
+    if (boss) meta.markSeen([`boss:${boss.id}`]);
+  }, [boss]);
+  useEffect(() => {
+    if (boardMod) meta.markSeen([`mod:${boardMod.id}`]);
+  }, [boardMod]);
 
   useEffect(() => {
     if (!dict) loadDictionary().then(setDict);
