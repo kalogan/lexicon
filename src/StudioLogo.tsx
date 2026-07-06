@@ -7,11 +7,13 @@
  * tagline, and the woven-threads-into-a-goober SVG (`WovenwildArt`, self-animated
  * via studio-logo.css keyframes so it runs even backgrounded).
  *
- * (No chime here: LEXICON opens straight into this ident with no tap-gate, so the
- * AudioContext is still suspended — a cue would be silent anyway. Audio unlocks on
- * the first title gesture.)
+ * A calm chime fires via the kit's `onCue` as the goober's eyes open. It's silent
+ * on a stone-cold first load (the AudioContext is still locked before any gesture,
+ * since LEXICON has no tap-gate), but plays on later visits once the browser lets
+ * audio start — the same behaviour as CHIMERA.
  */
 import { StudioIdent } from "game-kit/title/r3f";
+import { sound } from "./sound.js";
 import "./studio-logo.css";
 
 // Six thread strands sweeping in from the edges to the goober's center — drawn
@@ -50,7 +52,7 @@ function WovenwildArt() {
 
 export function StudioLogo({ onDone }: { onDone: () => void }) {
   return (
-    <StudioIdent wordmark="WOVENWILD" tagline="games" onDone={onDone}>
+    <StudioIdent wordmark="WOVENWILD" tagline="games" onDone={onDone} onCue={() => sound.chime()}>
       <WovenwildArt />
     </StudioIdent>
   );

@@ -31,9 +31,12 @@ export function App() {
   const [best, setBest] = useState(0);
   const [isNewBest, setIsNewBest] = useState(false);
 
-  // Warm the (async, code-split) dictionary early so it's ready by first play.
+  // Warm the (async, code-split) dictionary early so it's ready by first play,
+  // and attempt to open the audio context now so the studio-ident chime can sound
+  // on browsers that permit it (a stone-cold first load stays silent — no gesture).
   useEffect(() => {
     void loadDictionary();
+    sound.unlock();
   }, []);
 
   const startRound = (m: Mode) => {

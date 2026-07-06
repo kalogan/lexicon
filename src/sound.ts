@@ -323,6 +323,18 @@ class SoundManager {
     );
     this.tone({ wave: "triangle", freq: 261.63, gain: 0.06, attack: 0.02, duration: 0.95 });
   }
+
+  /**
+   * chime — a lightweight, calm twinkle for the WOVENWILD studio ident, played as
+   * the mark's eyes open (the "newborn" moment). Two soft high sine bells with a
+   * slow bloom — gentle and brief, never a jingle. Silent on a stone-cold first
+   * load (audio still locked pre-gesture); plays on later visits once unlocked.
+   */
+  chime(): void {
+    if (!this.ready()) return;
+    this.tone({ wave: "sine", freq: 987.77, gain: 0.07, attack: 0.012, duration: 0.5 }); // B5
+    this.tone({ wave: "sine", freq: 1318.51, gain: 0.05, delay: 0.13, attack: 0.012, duration: 0.6 }); // E6
+  }
 }
 
 /** The shared singleton — import and call anywhere; safe before `unlock()`. */

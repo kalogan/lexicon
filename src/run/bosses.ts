@@ -17,6 +17,11 @@ export interface Boss {
   blocked?: (size: number, seed: number) => number[];
   /** If true, the board ends after one submitted word — make it count. */
   oneWord?: boolean;
+  /** Discount on the board's target — the CONSTRAINT is the difficulty, so the
+   *  score bar comes down to keep the board hard-but-passable (a boss shouldn't
+   *  owe the same score as an unconstrained board). One-word bosses need the
+   *  deepest cut, since a single word must clear the whole target. */
+  targetMult: number;
 }
 
 function sealCells(size: number, seed: number, fraction: number): number[] {
@@ -33,12 +38,14 @@ export const BOSSES: readonly Boss[] = [
     name: "The Librarian",
     blurb: "Only words of 5+ letters count.",
     allow: (w) => w.length >= 5,
+    targetMult: 0.55,
   },
   {
     id: "minimalist",
     name: "The Minimalist",
     blurb: "No word longer than 5 letters.",
     allow: (w) => w.length <= 5,
+    targetMult: 0.7,
   },
   {
     id: "echo",
@@ -49,18 +56,21 @@ export const BOSSES: readonly Boss[] = [
       for (const f of found) if (f[0] === first) return false;
       return true;
     },
+    targetMult: 0.65,
   },
   {
     id: "warden",
     name: "The Warden",
     blurb: "Sealed tiles — trace around the shadows.",
     blocked: (size, seed) => sealCells(size, seed, 0.18),
+    targetMult: 0.72,
   },
   {
     id: "oracle",
     name: "The Oracle",
     blurb: "One word. Make it your masterpiece.",
     oneWord: true,
+    targetMult: 0.3,
   },
   {
     id: "oubliette",
@@ -68,6 +78,7 @@ export const BOSSES: readonly Boss[] = [
     blurb: "One word — and a third of the board is sealed.",
     oneWord: true,
     blocked: (size, seed) => sealCells(size, seed, 0.32),
+    targetMult: 0.26,
   },
 ];
 

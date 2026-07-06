@@ -128,7 +128,9 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const bestDepth = useRef(Number(localStorage.getItem("lexicon:bestDepth") ?? 0));
   const [newRecord, setNewRecord] = useState(false);
   const tracing = useRef(false);
-  const target = targetFor(boardIdx);
+  // Boss boards discount the target — the constraint IS the difficulty, so the
+  // score bar drops to keep them hard-but-passable (never an unwinnable wall).
+  const target = Math.round(targetFor(boardIdx) * (boss?.targetMult ?? 1));
   const ready = dict !== null;
   const running = ready && phase === "play";
 
