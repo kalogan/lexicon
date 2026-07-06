@@ -8,18 +8,29 @@ import {
   duplicateLetterAt,
   deckComposition,
   expandDist,
+  letterOffer,
 } from "./deck.js";
 
 describe("STARTER_LETTER_DECK", () => {
-  it("is a comfortably-sized, vowel-healthy bag", () => {
-    expect(STARTER_LETTER_DECK.length).toBeGreaterThanOrEqual(MIN_DECK + 10);
-    const vowels = STARTER_LETTER_DECK.filter((t) => "aeiou".includes(t)).length;
-    const ratio = vowels / STARTER_LETTER_DECK.length;
-    expect(ratio).toBeGreaterThan(0.28);
-    expect(ratio).toBeLessThan(0.5);
+  it("is one of every letter (26 distinct tiles, q as 'qu')", () => {
+    expect(STARTER_LETTER_DECK).toHaveLength(26);
+    expect(new Set(STARTER_LETTER_DECK).size).toBe(26); // all distinct — one of each
+    expect(STARTER_LETTER_DECK).toContain("qu");
+    expect(STARTER_LETTER_DECK).not.toContain("q"); // q ships as the playable "qu"
+    expect(STARTER_LETTER_DECK.length).toBeGreaterThan(MIN_DECK); // enough to fill a board
   });
   it("expandDist round-trips counts", () => {
     expect(expandDist({ a: 2, b: 1 }).sort()).toEqual(["a", "a", "b"]);
+  });
+});
+
+describe("letterOffer", () => {
+  it("returns n distinct valid letters", () => {
+    const offer = letterOffer(10);
+    expect(offer).toHaveLength(10);
+    expect(new Set(offer).size).toBe(10); // distinct
+    const valid = new Set<string>([..."abcdefghijklmnoprstuvwxyz".split(""), "qu"]);
+    for (const l of offer) expect(valid.has(l)).toBe(true);
   });
 });
 

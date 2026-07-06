@@ -19,25 +19,47 @@ import type { Board, Cell } from "../board.js";
 /** A letter tile. v1 = a bare letter; "qu" allowed (renders "Qu", spells "qu"). */
 export type Tile = string;
 
-/** The starting deck as a letter→count distribution — a balanced, playable bag
- *  (~35% vowels) sized so a 5×5 (25 tiles) shows about half your deck each board. */
-const STARTER_DIST: Readonly<Record<string, number>> = {
-  a: 4, e: 5, i: 4, o: 3, u: 2, // 18 vowels
-  t: 3, n: 3, r: 3, s: 3, // 12
-  l: 2, d: 2, g: 2, c: 2, m: 2, h: 2, // 12
-  b: 1, f: 1, p: 1, y: 1, k: 1, w: 1, v: 1, // 7
-};
-
 /** Expand a letter→count distribution into a flat tile bag. */
 export function expandDist(dist: Readonly<Record<string, number>>): Tile[] {
   return Object.entries(dist).flatMap(([letter, n]) => Array<Tile>(n).fill(letter));
 }
 
-/** The deck every Challenge run starts with (49 tiles). */
-export const STARTER_LETTER_DECK: readonly Tile[] = expandDist(STARTER_DIST);
+/**
+ * The Challenge BASE deck: one of every letter (a–z), with q as the playable "qu"
+ * tile (26 tiles). You draft 5 more at the opening, then add/remove over the run —
+ * so building vowels + duplicates of useful letters is the whole deck-craft.
+ */
+export const STARTER_LETTER_DECK: readonly Tile[] = [
+  ..."abcdefghijklmnoprstuvwxyz".split(""),
+  "qu",
+];
 
 /** The fewest tiles a deck may hold — must cover a board with a little spare. */
 export const MIN_DECK = 25;
+
+/** Weighted pool for the opening draft's letter offers (vowels + commons favored,
+ *  a little rare-letter spice). */
+const OFFER_WEIGHTS: Readonly<Record<string, number>> = {
+  e: 6, a: 5, i: 4, o: 4, u: 3,
+  s: 5, t: 5, r: 5, n: 5, l: 4, d: 3, c: 3, g: 3, m: 3, h: 3,
+  p: 2, b: 2, f: 2, y: 2, w: 2, qu: 2, k: 1, v: 1, x: 1, z: 1, j: 1,
+};
+
+/** `n` DISTINCT letters offered at the opening draft, weighted toward the useful
+ *  ones so doubling up on vowels/commons is the natural (but not forced) play. */
+export function letterOffer(n = 10): Tile[] {
+  const pool = expandDist(OFFER_WEIGHTS);
+  const out: Tile[] = [];
+  const seen = new Set<Tile>();
+  let guard = 0;
+  while (out.length < n && guard++ < 3000) {
+    const l = pool[Math.floor(Math.random() * pool.length)]!;
+    if (seen.has(l)) continue;
+    seen.add(l);
+    out.push(l);
+  }
+  return out;
+}
 
 function tileToCell(t: Tile): Cell {
   const v = t.toLowerCase();

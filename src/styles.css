@@ -1023,6 +1023,55 @@ body,
   color: #fff;
 }
 .letterpick-key:active { transform: translateY(0); }
+.letterpick-key.picked {
+  background: var(--lex-accent);
+  color: #fff;
+  border-color: var(--lex-accent-deep);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(217, 138, 61, 0.5);
+}
+
+/* Challenge opening draft — see your deck + pick 5 letters to add */
+.ldraft-card {
+  width: min(92vw, 400px);
+  max-height: 88vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #fbf7ee;
+  border-radius: 22px;
+  padding: 20px;
+  box-shadow: 0 24px 70px rgba(20, 14, 30, 0.4);
+  text-align: center;
+  animation: pop-in 0.28s ease;
+}
+.ldraft-deck {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+}
+.ldraft-chip {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--lex-ink);
+  background: rgba(43, 36, 64, 0.06);
+  border-radius: 8px;
+  padding: 4px 7px;
+}
+.ldraft-chip b {
+  color: var(--lex-accent-deep);
+  margin-left: 2px;
+  font-size: 10px;
+}
+.ldraft-label {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lex-muted);
+  font-weight: 800;
+}
 
 /* Abandon-run confirmation modal */
 .confirm-card {

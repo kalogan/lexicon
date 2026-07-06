@@ -20,6 +20,8 @@ import {
   makeBoardFromDeck,
   addLetter,
   removeOneLetter,
+  letterOffer,
+  deckComposition,
   type Tile,
 } from "./run/deck.js";
 import {
@@ -95,7 +97,10 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   const [letters, setLetters] = useState<Tile[]>(() => [...STARTER_LETTER_DECK]);
   const [coins, setCoins] = useState(0);
   const [step, setStep] = useState(0); // which blind (0..TOTAL_BLINDS-1)
-  const [phase, setPhase] = useState<"intro" | "play" | "shop" | "won" | "lost">("intro");
+  const [phase, setPhase] = useState<"draft" | "intro" | "play" | "shop" | "won" | "lost">("draft");
+  // Opening draft: choose 5 of 10 offered letters to add to the base deck.
+  const [offer] = useState(() => letterOffer(10));
+  const [picked, setPicked] = useState<Set<number>>(() => new Set());
 
   const [boardSeed, setBoardSeed] = useState(() => Date.now());
   const board = useMemo(() => makeBoardFromDeck(letters, boardSeed, SIZE), [letters, boardSeed]);
@@ -126,6 +131,20 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     music.start();
     return () => music.stop();
   }, []);
+
+  // Opening draft → add the 5 chosen letters, then into the first ante.
+  const confirmDraft = () => {
+    const chosen = [...picked].map((i) => offer[i]!).filter(Boolean);
+    setLetters((d) => [...d, ...chosen]);
+    setPhase("intro");
+  };
+  const togglePick = (i: number) =>
+    setPicked((s) => {
+      const next = new Set(s);
+      if (next.has(i)) next.delete(i);
+      else if (next.size < 5) next.add(i);
+      return next;
+    });
 
   // ── Blind lifecycle ─────────────────────────────────────────────────────────
   const beginBlind = () => {
@@ -262,6 +281,44 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     cur.length >= MIN_WORD_LEN && dict && dict.has(cur) && !found.has(cur) ? scoreWord(cur, relics, run) : null;
 
   // ── Overlays ─────────────────────────────────────────────────────────────────
+  if (phase === "draft") {
+    const comp = deckComposition(letters);
+    return (
+      <div className="menu-veil">
+        <div className="ldraft-card">
+          <div className="menu-title">Build your opening deck</div>
+          <div className="confirm-sub">
+            You start with one of every letter. Choose 5 more to add — double up on vowels and letters you love.
+          </div>
+          <div className="ldraft-deck" aria-label="your current deck">
+            {comp.map(({ letter, count }) => (
+              <span key={letter} className="ldraft-chip">
+                {letter === "qu" ? "Qu" : letter.toUpperCase()}
+                {count > 1 && <b>×{count}</b>}
+              </span>
+            ))}
+          </div>
+          <div className="ldraft-label">Add 5 · {picked.size}/5</div>
+          <div className="letterpick-grid">
+            {offer.map((l, i) => (
+              <button
+                key={i}
+                type="button"
+                className={`letterpick-key${picked.has(i) ? " picked" : ""}`}
+                aria-pressed={picked.has(i)}
+                onClick={() => togglePick(i)}
+              >
+                {l === "qu" ? "Qu" : l.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <button className="btn primary" disabled={picked.size !== 5} onClick={confirmDraft}>
+            Add 5 &amp; begin →
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (phase === "intro") {
     return <AnteBanner blind={blind} totalAntes={TOTAL_ANTES} onStart={beginBlind} />;
   }
