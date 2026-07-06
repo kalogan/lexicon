@@ -321,12 +321,37 @@ class SoundManager {
   }
 
   /**
-   * tick — a quiet clock tick for the final ~10 seconds of a timed round. Very
-   * short and low-gain so it's a background pulse, not a nag.
+   * tick — a quiet clock tick for the final ~10 seconds of a timed round. A soft
+   * WOODEN tick (a very short low-passed noise blip + a low body knock) rather
+   * than a pure sine — subtle, a background pulse that suits the organic palette.
    */
   tick(): void {
     if (!this.ready()) return;
-    this.tone({ wave: "sine", freq: 880, gain: 0.05, attack: 0.001, duration: 0.04 });
+    this.noise({ type: "lowpass", freq: 520, q: 0.9, gain: 0.045, duration: 0.028 });
+    this.tone({ wave: "triangle", freq: 300, gain: 0.03, attack: 0.001, duration: 0.035 });
+  }
+
+  /**
+   * coin — a warm CERAMIC/wooden clink for coins gained or spent. NOT a metallic
+   * cha-ching: two quick, soft high plinks (marimba-ish sines around ~700 + ~1050
+   * Hz), very short and low-gain, lightly arpeggiated. Cozy and satisfying.
+   */
+  coin(): void {
+    if (!this.ready()) return;
+    this.marimba(700, 0.08, 0, 0.16);
+    this.marimba(1050, 0.06, 0.045, 0.14);
+  }
+
+  /**
+   * relicShimmer — a soft, glassy bell "ping" for when a relic fires during
+   * scoring: a gentle high sine plus a quiet harmonic, with a quick attack and a
+   * short shimmer tail. Quiet enough to layer under `found` without clutter —
+   * "a little magic sparkle", warm rather than chimey-harsh.
+   */
+  relicShimmer(): void {
+    if (!this.ready()) return;
+    this.tone({ wave: "sine", freq: 1244.51, gain: 0.05, attack: 0.004, duration: 0.36 }); // D#6
+    this.tone({ wave: "sine", freq: 1864.66, gain: 0.022, delay: 0.03, attack: 0.004, duration: 0.28 }); // D#7
   }
 
   /**
@@ -347,29 +372,15 @@ class SoundManager {
   }
 
   /**
-   * begin — a soft rising flourish when a round starts. A quick two-note lift
-   * (root → fifth) with a gentle attack: "here we go".
+   * begin — a warm MARIMBA lift when a round starts: a quick three-note rising
+   * flourish (root → fifth → octave, E4–B4–E5) on the woody marimba helper,
+   * organic to match the palette: "here we go".
    */
   begin(): void {
     if (!this.ready()) return;
-    this.tone({ wave: "triangle", freq: 329.63, gain: 0.11, attack: 0.008, duration: 0.2 });
-    this.tone({
-      wave: "triangle",
-      freq: 493.88,
-      gain: 0.12,
-      delay: 0.11,
-      attack: 0.008,
-      duration: 0.3,
-    });
-    // A quiet octave sparkle on top to make the lift feel bright, not flat.
-    this.tone({
-      wave: "sine",
-      freq: 659.25,
-      gain: 0.06,
-      delay: 0.18,
-      attack: 0.006,
-      duration: 0.28,
-    });
+    this.marimba(329.63, 0.12, 0, 0.26); // E4
+    this.marimba(493.88, 0.11, 0.1, 0.3); // B4
+    this.marimba(659.25, 0.09, 0.19, 0.34); // E5
   }
 
   /**

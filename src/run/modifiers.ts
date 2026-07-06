@@ -124,6 +124,98 @@ export const MODIFIERS: readonly BoardMod[] = [
       }
     }),
   },
+  {
+    id: "twin-flame",
+    name: "Twin Flame",
+    blurb: "Words with a doubled letter: ×2 mult.",
+    tone: "twist",
+    card: modCard("twin-flame", "Twin Flame", "Words with a doubled letter: ×2 mult", (ctx) => {
+      if (ctx.props.doubles > 0) {
+        ctx.mult *= 2;
+        ctx.trigger("Twin Flame", "×2");
+      }
+    }),
+  },
+  {
+    id: "kaleidoscope",
+    name: "Kaleidoscope",
+    blurb: "No repeated letters: +30 chips.",
+    tone: "twist",
+    card: modCard("kaleidoscope", "Kaleidoscope", "No repeated letters: +30 chips", (ctx) => {
+      if (ctx.props.allDistinct) {
+        ctx.chips += 30;
+        ctx.trigger("Kaleidoscope", "+30");
+      }
+    }),
+  },
+  {
+    id: "root-work",
+    name: "Root Work",
+    blurb: "Words with a known prefix: ×1.5 mult.",
+    tone: "twist",
+    card: modCard("root-work", "Root Work", "Words with a known prefix: ×1.5 mult", (ctx) => {
+      if (ctx.props.prefix) {
+        ctx.mult *= 1.5;
+        ctx.trigger("Root Work", "×1.5");
+      }
+    }),
+  },
+  {
+    id: "flourish",
+    name: "Flourish",
+    blurb: "Words with a known suffix: +25 chips.",
+    tone: "twist",
+    card: modCard("flourish", "Flourish", "Words with a known suffix: +25 chips", (ctx) => {
+      if (ctx.props.suffix) {
+        ctx.chips += 25;
+        ctx.trigger("Flourish", "+25");
+      }
+    }),
+  },
+  {
+    id: "spread",
+    name: "Spread",
+    blurb: "5+ distinct letters: +45 chips.",
+    tone: "twist",
+    card: modCard("spread", "Spread", "5+ distinct letters: +45 chips", (ctx) => {
+      if (ctx.props.distinct >= 5) {
+        ctx.chips += 45;
+        ctx.trigger("Spread", "+45");
+      }
+    }),
+  },
+  {
+    id: "marathon",
+    name: "Marathon",
+    blurb: "7+ letter words: ×2 mult.",
+    tone: "twist",
+    card: modCard("marathon", "Marathon", "7+ letter words: ×2 mult", (ctx) => {
+      if (ctx.props.len >= 7) {
+        ctx.mult *= 2;
+        ctx.trigger("Marathon", "×2");
+      }
+    }),
+  },
+  {
+    id: "slow-burn",
+    name: "Slow Burn",
+    blurb: "4+ letter words: +3s.",
+    tone: "boon",
+    card: modCard("slow-burn", "Slow Burn", "4+ letter words: +3s", (ctx) => {
+      if (ctx.props.len >= 4) {
+        ctx.timeGain += 3;
+        ctx.trigger("Slow Burn", "+3s");
+      }
+    }),
+  },
+  {
+    id: "twin-gold",
+    name: "Twin Gold",
+    blurb: "Two tiles glow — any word tracing through one scores ×2.",
+    tone: "boon",
+    goldTile: true,
+    goldMult: 2,
+  },
 ];
 
 /** Roll a modifier for a REGULAR board, deterministic by seed. ~45% of the time returns

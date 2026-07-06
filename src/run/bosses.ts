@@ -80,6 +80,60 @@ export const BOSSES: readonly Boss[] = [
     blocked: (size, seed) => sealCells(size, seed, 0.32),
     targetMult: 0.26,
   },
+  {
+    id: "botanist",
+    name: "The Botanist",
+    blurb: "Every word needs 3+ vowels.",
+    allow: (w) => {
+      let v = 0;
+      for (const c of w) if (c === "a" || c === "e" || c === "i" || c === "o" || c === "u") v++;
+      return v >= 3;
+    },
+    targetMult: 0.62,
+  },
+  {
+    id: "purist",
+    name: "The Purist",
+    blurb: "No doubled letters — every letter must differ from its neighbour.",
+    allow: (w) => {
+      for (let i = 1; i < w.length; i++) if (w[i] === w[i - 1]) return false;
+      return true;
+    },
+    targetMult: 0.68,
+  },
+  {
+    id: "collector",
+    name: "The Collector",
+    blurb: "Every word must carry a rare letter — Q, X, J or Z.",
+    allow: (w) => /[qxjz]/.test(w),
+    targetMult: 0.6,
+  },
+  {
+    id: "surveyor",
+    name: "The Surveyor",
+    blurb: "Words must be 4 to 6 letters — no more, no less.",
+    allow: (w) => w.length >= 4 && w.length <= 6,
+    targetMult: 0.66,
+  },
+  {
+    id: "serpent",
+    name: "The Serpent",
+    blurb: "Each word must start with the last letter of the one before.",
+    allow: (w, found) => {
+      let prev: string | null = null;
+      for (const f of found) prev = f; // insertion order — the most recent word
+      return prev === null || w[0] === prev[prev.length - 1];
+    },
+    targetMult: 0.62,
+  },
+  {
+    id: "hermit",
+    name: "The Hermit",
+    blurb: "One word — half the board is sealed. Find the seam.",
+    oneWord: true,
+    blocked: (size, seed) => sealCells(size, seed, 0.5),
+    targetMult: 0.28,
+  },
 ];
 
 export function randomBoss(seed: number): Boss {

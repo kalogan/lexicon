@@ -278,6 +278,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setFly({ id: Date.now(), total });
     buzz(goldHit ? [0, 14, 22, 14] : 12); // a little pulse on every word; a richer one on gold
     sound.found(Math.min(11, Math.round(total / 40) + 1));
+    if (b.triggers.length > 0) sound.relicShimmer(); // a soft sparkle when relics fire
     // Stats + achievements for this word (length, score, rare letters, and the
     // run's permanent mult after committing it).
     notifyAch([
@@ -447,7 +448,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setCoins((c) => c - price);
     setDeck((d) => [...d, card]);
     setShopStock((s) => s.filter((c) => c.id !== card.id));
-    sound.found(3);
+    sound.coin();
   };
 
   const reroll = () => {
@@ -577,12 +578,17 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
           <span className="bd-toast">
             <b>{toast.word.toUpperCase()}</b> {toast.chips} × {round1(toast.mult)} = <b>{toast.total}</b>
             {toast.timeGain > 0 && <em> +{toast.timeGain}s</em>}
+            {toast.triggers.length > 0 && (
+              <small>{toast.triggers.map((t) => `${t.card} ${t.detail}`).join(" · ")}</small>
+            )}
           </span>
         ) : preview ? (
           <span className="bd-live">
             {preview.chips} × {round1(preview.mult)} = <b>{preview.total}</b>
             {preview.timeGain > 0 && <em> +{preview.timeGain}s</em>}
-            <small>{preview.triggers.map((t) => t.card).join(" · ")}</small>
+            {preview.triggers.length > 0 && (
+              <small>{preview.triggers.map((t) => `${t.card} ${t.detail}`).join(" · ")}</small>
+            )}
           </span>
         ) : (
           <span className="bd-hint">

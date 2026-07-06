@@ -90,6 +90,55 @@ export const CHARMS: readonly Charm[] = [
     rarity: "uncommon",
     effect: { kind: "transmute" },
   },
+  {
+    id: "charm-second-wind",
+    name: "Second Wind",
+    blurb: "Three more plays this board.",
+    rarity: "rare",
+    effect: { kind: "plays", count: 3 },
+  },
+  {
+    id: "charm-shuffle",
+    name: "Shuffle",
+    blurb: "Deal a whole new set of letters.",
+    rarity: "common",
+    effect: { kind: "reroll" },
+  },
+  {
+    id: "charm-limelight",
+    name: "Limelight",
+    blurb: "Your next word scores ×2.",
+    rarity: "uncommon",
+    effect: { kind: "doubleNext" },
+  },
+  {
+    id: "charm-keyring",
+    name: "Keyring",
+    blurb: "Shatter every sealed tile on this board.",
+    rarity: "rare",
+    effect: { kind: "clearSeals" },
+  },
+  {
+    id: "charm-lodestone",
+    name: "Lodestone",
+    blurb: "+0.75 permanent mult for the rest of this run.",
+    rarity: "uncommon",
+    effect: { kind: "permaMult", amount: 0.75 },
+  },
+  {
+    id: "charm-keystone",
+    name: "Keystone",
+    blurb: "+1.5 permanent mult for the rest of this run.",
+    rarity: "legendary",
+    effect: { kind: "permaMult", amount: 1.5 },
+  },
+  {
+    id: "charm-alchemy",
+    name: "Alchemy",
+    blurb: "Change one board tile into any letter you pick.",
+    rarity: "rare",
+    effect: { kind: "transmute" },
+  },
 ];
 
 /** Deterministically pick a charm from CHARMS by seed (weighted toward commons). */

@@ -13,6 +13,7 @@ import { EXTRA_CARDS2 } from "./cards-extra2.js";
 import { EXTRA_CARDS3 } from "./cards-extra3.js";
 import { EXTRA_CARDS4 } from "./cards-extra4.js";
 import { EXTRA_CARDS5 } from "./cards-extra5.js";
+import { EXTRA_CARDS6 } from "./cards-extra6.js";
 
 // ── Dictionaries (persistent) ────────────────────────────────────────────────
 
@@ -165,6 +166,7 @@ export const CATALOG: readonly Card[] = [
   ...EXTRA_CARDS3,
   ...EXTRA_CARDS4,
   ...EXTRA_CARDS5,
+  ...EXTRA_CARDS6,
 ];
 
 /** A gentle starting deck for REAL runs; everything else is drafted 1-of-3. */
@@ -188,4 +190,5 @@ export const DRAFT_POOL: readonly Card[] = [
   ...EXTRA_CARDS3,
   ...EXTRA_CARDS4,
   ...EXTRA_CARDS5,
+  ...EXTRA_CARDS6,
 ];

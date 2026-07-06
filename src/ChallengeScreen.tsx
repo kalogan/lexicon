@@ -114,6 +114,7 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   const [flash, setFlash] = useState<Set<string>>(() => new Set());
   const [fly, setFly] = useState<{ id: number; total: number } | null>(null);
   const [shopStock, setShopStock] = useState<ShopRelic[]>([]);
+  const [inspect, setInspect] = useState<Card | null>(null);
 
   const tracing = useRef(false);
   const ending = useRef(false);
@@ -221,6 +222,7 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     setFly({ id: Date.now(), total });
     buzz(12);
     sound.found(Math.min(11, Math.round(total / 40) + 1));
+    if (b.triggers.length > 0) sound.relicShimmer();
 
     const remaining = playsLeft - 1;
     setPlaysLeft(remaining);
@@ -253,13 +255,13 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
       const i = s.findIndex((e) => e.card === card);
       return i < 0 ? s : [...s.slice(0, i), ...s.slice(i + 1)];
     });
-    sound.found(3);
+    sound.coin();
   };
   const addTile = (letter: string) => {
     if (coins < ADD_LETTER_COST) return;
     setCoins((c) => c - ADD_LETTER_COST);
     setLetters((d) => addLetter(d, letter));
-    sound.tap();
+    sound.coin();
   };
   const removeTile = (letter: Tile) => {
     if (coins < REMOVE_TILE_COST) return;
@@ -267,7 +269,7 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     if (next.length === letters.length) return; // nothing removed (at the floor / absent)
     setCoins((c) => c - REMOVE_TILE_COST);
     setLetters(next);
-    sound.tap();
+    sound.coin();
   };
   const reroll = () => {
     if (coins < REROLL_COST) return;
@@ -279,6 +281,7 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   const cur = pathWord(path, board);
   const preview =
     cur.length >= MIN_WORD_LEN && dict && dict.has(cur) && !found.has(cur) ? scoreWord(cur, relics, run) : null;
+  const inspectAccrued = inspect?.accrued?.(run) ?? null;
 
   // ── Overlays ─────────────────────────────────────────────────────────────────
   if (phase === "draft") {
@@ -390,10 +393,10 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
       </div>
 
       <div className="deck-wrap">
-        <span className="deck-label">◈ relics · {relics.length} · 🎴 deck {letters.length}</span>
+        <span className="deck-label">◈ relics · {relics.length} · tap to inspect · 🎴 deck {letters.length}</span>
         <div className="deck">
           {relics.map((c, i) => (
-            <RelicCard key={c.id + i} card={c} mode="chip" flash={flash.has(c.name)} />
+            <RelicCard key={c.id + i} card={c} mode="chip" flash={flash.has(c.name)} onClick={() => setInspect(c)} />
           ))}
         </div>
       </div>
@@ -402,16 +405,37 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
         {toast ? (
           <span className="bd-toast">
             <b>{toast.word.toUpperCase()}</b> {toast.chips} × {round1(toast.mult)} = <b>{toast.total}</b>
+            {toast.triggers.length > 0 && (
+              <small>{toast.triggers.map((t) => `${t.card} ${t.detail}`).join(" · ")}</small>
+            )}
           </span>
         ) : preview ? (
           <span className="bd-live">
             {preview.chips} × {round1(preview.mult)} = <b>{preview.total}</b>
-            <small>{preview.triggers.map((t) => t.card).join(" · ")}</small>
+            {preview.triggers.length > 0 && (
+              <small>{preview.triggers.map((t) => `${t.card} ${t.detail}`).join(" · ")}</small>
+            )}
           </span>
         ) : (
           <span className="bd-hint">trace a word — dealt from your deck</span>
         )}
       </div>
+
+      {inspect && (
+        <div className="menu-veil" onClick={() => setInspect(null)}>
+          <div className="inspect-card" onClick={(e) => e.stopPropagation()}>
+            <RelicCard card={inspect} mode="full" />
+            {inspectAccrued ? (
+              <div className="accrued">📈 {inspectAccrued}</div>
+            ) : (
+              <div className="accrued accrued--none">no bonus banked yet this run</div>
+            )}
+            <button className="btn primary" onClick={() => setInspect(null)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="board-wrap" style={{ width: "min(var(--run-w, 92vw), 520px, calc(100svh - 380px))" }}>
         <div
