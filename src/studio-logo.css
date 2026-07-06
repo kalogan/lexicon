@@ -1,11 +1,9 @@
-/* WOVENWILD studio ident — SVG threads weave into a goober (the studio mark).
-   Ported from CHIMERA so the WOVENWILD intro is consistent across games. Only
-   the ART lives here; the kit <StudioIdent> owns the wrap / wordmark / tagline /
-   skip / timing. All CSS keyframes so it runs even in a backgrounded tab. */
+/* WOVENWILD studio intro — an INTERACTIVE scene. The frog weaves in from threads
+   and settles with the wordmark; then TAP THE FROG and it winks + flies its tongue
+   up-right (`.studio-scene--react`), and the scene fades to the title. The tongue
+   + wink are gated behind `--react` so they only fire on the tap. */
 
-/* Tap-to-wake: one gesture unlocks audio so the intro can play its chime + thwup
-   (browsers block all sound until a real user interaction). */
-.studio-wake {
+.studio-scene {
   position: fixed;
   inset: 0;
   z-index: 100;
@@ -13,42 +11,31 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 6px;
   cursor: pointer;
+  overflow: hidden;
   background: radial-gradient(circle at 50% 42%, #fbf3e2 0%, #efe0c2 58%, #e4d0a8 100%);
 }
-.studio-wake-frog {
-  font-size: 64px;
-  line-height: 1;
-  animation: studioWakeBob 1.9s ease-in-out infinite;
+/* On the tap: hold briefly, then fade the whole scene to the title. */
+.studio-scene--react {
+  animation: studioSceneOut 1.5s ease forwards;
+  cursor: default;
 }
-.studio-wake-hint {
-  font-size: 14px;
-  letter-spacing: 0.34em;
-  text-transform: uppercase;
-  color: #8a6a3f;
-  animation: studioWakePulse 1.7s ease-in-out infinite;
-}
-@keyframes studioWakeBob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-7px); }
-}
-@keyframes studioWakePulse {
-  0%, 100% { opacity: 0.45; }
-  50% { opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .studio-wake-frog, .studio-wake-hint { animation: none; }
+@keyframes studioSceneOut {
+  0%, 55% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 .studio-art {
-  width: min(78vw, 460px);
+  width: min(74vw, 440px);
   height: auto;
-  max-height: 58vh;
+  max-height: 50vh;
   display: block;
 }
 
-/* Threads: draw on (stroke-dashoffset), then fade back as the goober forms. */
+/* ── The frog forms on mount (silent, no gesture needed) ─────────────────────── */
+
+/* Threads: draw on, then fade back as the goober forms. */
 .studio-thread {
   fill: none;
   stroke: #c9762e;
@@ -57,119 +44,150 @@
   stroke-dasharray: 100;
   stroke-dashoffset: 100;
   opacity: 0;
-  animation: studioThread 2.9s ease forwards;
+  animation: studioThread 2s ease forwards;
 }
 @keyframes studioThread {
   0% { stroke-dashoffset: 100; opacity: 0; }
-  8% { opacity: 0.85; }
-  42% { stroke-dashoffset: 0; opacity: 0.85; }
-  64% { stroke-dashoffset: 0; opacity: 0.22; }
+  10% { opacity: 0.85; }
+  46% { stroke-dashoffset: 0; opacity: 0.85; }
+  66% { stroke-dashoffset: 0; opacity: 0.22; }
   100% { stroke-dashoffset: 0; opacity: 0.12; }
 }
 
-/* Goober: scales/fades in as the threads gather. */
 .studio-goober {
   transform-box: fill-box;
   transform-origin: 200px 158px;
   opacity: 0;
-  animation: studioGoober 2.9s ease forwards;
+  animation: studioGoober 2s ease forwards;
 }
 @keyframes studioGoober {
   0% { opacity: 0; transform: scale(0.35); }
-  32% { opacity: 0; transform: scale(0.5); }
-  52% { opacity: 1; transform: scale(1.05); }
-  60% { transform: scale(1); }
-  88% { opacity: 1; }
+  30% { opacity: 0; transform: scale(0.5); }
+  52% { opacity: 1; transform: scale(1.06); }
+  62% { transform: scale(1); }
   100% { opacity: 1; transform: scale(1); }
 }
 .studio-body { fill: #6fb98f; stroke: #4e9a70; stroke-width: 2; }
-/* Frog eyes: pale eyeball + dark pupil + bright glint, all opening together. */
-.studio-eyeball { fill: #fbf7ee; stroke: #4e9a70; stroke-width: 1.5; opacity: 0; animation: studioEye 2.9s ease forwards; }
-.studio-pupil { fill: #1a1420; opacity: 0; animation: studioEye 2.9s ease forwards; }
-.studio-glint { fill: #fff; opacity: 0; animation: studioEye 2.9s ease forwards; }
+
+/* Frog eyes: pale eyeball + dark pupil + bright glint, opening together. */
+.studio-eyeball { fill: #fbf7ee; stroke: #4e9a70; stroke-width: 1.5; opacity: 0; animation: studioEye 2s ease forwards; }
+.studio-pupil { fill: #1a1420; opacity: 0; animation: studioEye 2s ease forwards; }
+.studio-glint { fill: #fff; opacity: 0; animation: studioEye 2s ease forwards; }
 @keyframes studioEye {
   0% { opacity: 0; }
-  60% { opacity: 0; }
-  70% { opacity: 1; }
+  56% { opacity: 0; }
+  68% { opacity: 1; }
   100% { opacity: 1; }
 }
 
-/* Tongue: a quick flick out (stroke draws on) that locks, with a sticky tip that
-   pops on when it lands. Sequenced just after the eyes open. */
+/* ── The tongue + wink: REST state hidden; fire only on `.studio-scene--react` ── */
+
 .studio-tongue-body {
   fill: none;
   stroke: #e0637a;
   stroke-width: 9;
   stroke-linecap: round;
   stroke-dasharray: 210;
-  stroke-dashoffset: 210;
-  animation: studioTongue 2.9s ease forwards;
-}
-/* Lash out (~2.0-2.4s), then hold locked. The eye blinks right after (below),
-   then the whole ident fades (durationMs is timed to follow the blink). */
-@keyframes studioTongue {
-  0%, 70% { stroke-dashoffset: 210; }
-  84% { stroke-dashoffset: 0; }
-  100% { stroke-dashoffset: 0; }
+  stroke-dashoffset: 210; /* hidden at rest */
 }
 .studio-tongue-tip {
   fill: #d24e66;
-  opacity: 0;
+  opacity: 0; /* hidden at rest */
   transform-box: fill-box;
   transform-origin: center;
-  animation: studioTongueTip 2.9s ease forwards;
 }
-@keyframes studioTongueTip {
-  0%, 80% { opacity: 0; transform: scale(0.3); }
-  88% { opacity: 1; transform: scale(1.15); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-/* As the tongue lashes above it, the right eye BLINKS — closes, then reopens. */
 .studio-eye-right {
   transform-box: fill-box;
-  transform-origin: center;
-  animation: studioBlink 2.9s ease forwards;
+  transform-origin: center; /* scaleY 1 at rest */
 }
-@keyframes studioBlink {
-  0%, 82% { transform: scaleY(1); }
-  88% { transform: scaleY(0.08); } /* closed */
-  94% { transform: scaleY(1); } /* reopened */
+
+.studio-scene--react .studio-tongue-body { animation: studioLash 0.5s ease forwards; }
+@keyframes studioLash {
+  0%, 8% { stroke-dashoffset: 210; }
+  66% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 0; }
+}
+.studio-scene--react .studio-tongue-tip { animation: studioTip 0.5s ease forwards; }
+@keyframes studioTip {
+  0%, 52% { opacity: 0; transform: scale(0.3); }
+  76% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.studio-scene--react .studio-eye-right { animation: studioWink 0.55s ease forwards; }
+@keyframes studioWink {
+  0% { transform: scaleY(1); }
+  32% { transform: scaleY(0.08); } /* closes */
+  64% { transform: scaleY(1); } /* reopens */
   100% { transform: scaleY(1); }
 }
 
-/* Reduced motion: drop the draw-on + scale, keep gentle fades. */
-@media (prefers-reduced-motion: reduce) {
-  .studio-thread {
-    stroke-dashoffset: 0;
-    animation: studioThreadReduced 2.4s ease forwards;
-  }
-  .studio-goober {
-    transform: none;
-    animation: studioGooberReduced 2.4s ease forwards;
-  }
-  .studio-tongue-body {
-    stroke-dashoffset: 0;
-    animation: studioFadeInLate 2.9s ease forwards;
-  }
-  .studio-tongue-tip {
-    transform: none;
-    animation: studioFadeInLate 2.9s ease forwards;
-  }
-  .studio-eye-right { transform: none; animation: none; }
+/* ── The WOVENWILD / games wordmark + tap hint ───────────────────────────────── */
+
+.studio-brand {
+  text-align: center;
+  position: relative;
+  z-index: 1;
 }
-@keyframes studioFadeInLate {
-  0%, 68% { opacity: 0; }
-  84% { opacity: 1; }
+.studio-wordmark {
+  font-size: clamp(30px, 10vw, 60px);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #c9762e;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.6), 0 8px 22px rgba(43, 36, 64, 0.18);
+  opacity: 0;
+  animation: studioBrandIn 2s ease forwards;
+}
+@keyframes studioBrandIn {
+  0%, 55% { opacity: 0; transform: translateY(10px); }
+  78% { opacity: 1; transform: none; }
   100% { opacity: 1; }
 }
-@keyframes studioThreadReduced {
-  0% { opacity: 0; }
-  20% { opacity: 0.2; }
-  100% { opacity: 0.12; }
+.studio-tag {
+  margin-top: 8px;
+  font-size: clamp(11px, 3.4vw, 15px);
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+  color: #8a6a3f;
+  opacity: 0;
+  animation: studioTagIn 2s ease forwards;
 }
-@keyframes studioGooberReduced {
+@keyframes studioTagIn {
+  0%, 68% { opacity: 0; }
+  88% { opacity: 0.78; }
+  100% { opacity: 0.78; }
+}
+.studio-tap-hint {
+  position: absolute;
+  bottom: calc(11% + env(safe-area-inset-bottom, 0px));
+  font-size: 13px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #a98a5f;
+  opacity: 0;
+  animation:
+    studioHintIn 2.4s ease forwards,
+    studioHintPulse 1.7s ease-in-out 2.4s infinite;
+}
+@keyframes studioHintIn {
+  0%, 82% { opacity: 0; }
+  100% { opacity: 0.7; }
+}
+@keyframes studioHintPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.85; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-thread { stroke-dashoffset: 0; animation: studioFade 1.6s ease forwards; }
+  .studio-goober { transform: none; animation: studioFade 1.6s ease forwards; }
+  .studio-brand .studio-wordmark, .studio-tag { animation: studioFade 1.6s ease forwards; }
+  .studio-tap-hint { animation: studioHintIn 2s ease forwards; }
+  .studio-scene--react .studio-tongue-body { stroke-dashoffset: 0; animation: none; }
+  .studio-scene--react .studio-tongue-tip { opacity: 1; animation: none; }
+  .studio-scene--react .studio-eye-right { animation: none; }
+}
+@keyframes studioFade {
   0% { opacity: 0; }
-  30% { opacity: 1; }
+  60% { opacity: 1; }
   100% { opacity: 1; }
 }
