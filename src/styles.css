@@ -935,6 +935,27 @@ body,
   padding: 7px 12px;
   animation: pop-in 0.3s ease;
 }
+/* Achievement-unlock toast — a brief celebratory banner */
+.ach-toast {
+  width: min(92vw, 420px);
+  text-align: center;
+  font-weight: 800;
+  font-size: 14px;
+  color: #2b1c0c;
+  background: linear-gradient(180deg, #f3c65a, var(--lex-accent));
+  border-radius: 12px;
+  padding: 9px 12px;
+  box-shadow: 0 4px 14px rgba(217, 138, 61, 0.5);
+  animation: pop-in 0.32s ease;
+}
+.ach-toast-sub {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
 /* Transmute: the "tap a tile" prompt + the board's pick-mode cue + a morphed tile */
 .transmute-hint {
   color: #5f8fd0;

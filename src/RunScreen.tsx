@@ -13,6 +13,7 @@ import { STARTER_DECK, TUTORIAL_DECK, DRAFT_POOL } from "./run/cards.js";
 import { randomBoss, type Boss } from "./run/bosses.js";
 import { randomModifier, goldCell, type BoardMod } from "./run/modifiers.js";
 import { STARTER_CHARM, randomCharm, type Charm } from "./run/charms.js";
+import * as meta from "./meta.js";
 import { RelicCard } from "./RelicCard.js";
 import { sound } from "./sound.js";
 import { music } from "./music.js";
@@ -85,6 +86,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const firstRun = useRef(localStorage.getItem("lexicon:hasRun") !== "1");
   useEffect(() => {
     localStorage.setItem("lexicon:hasRun", "1");
+    meta.recordRunStart();
   }, []);
 
   const [dict, setDict] = useState<Dictionary | null>(() => readyDictionary());
@@ -157,8 +159,10 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const [inspect, setInspect] = useState<Card | null>(null);
   // Confirm before the ✕ abandons the run.
   const [confirmExit, setConfirmExit] = useState(false);
+  // Achievement-unlock toast.
+  const [achToast, setAchToast] = useState<string | null>(null);
   // Meta: deepest board ever reached (persists across runs).
-  const bestDepth = useRef(Number(localStorage.getItem("lexicon:bestDepth") ?? 0));
+  const bestDepth = useRef(meta.getStats().bestDepth);
   const [newRecord, setNewRecord] = useState(false);
   const tracing = useRef(false);
   // Guards a board from ending twice (e.g. plays run out and the clock hits 0 in
@@ -169,6 +173,23 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const target = Math.round(targetFor(boardIdx) * (boss?.targetMult ?? 1));
   const ready = dict !== null;
   const running = ready && phase === "play";
+
+  // Surface a freshly-unlocked achievement as a toast.
+  const notifyAch = (fresh: string[]) => {
+    if (!fresh.length) return;
+    const a = meta.ACHIEVEMENTS.find((x) => x.id === fresh[0]);
+    if (!a) return;
+    const msg = `🏆 ${a.name}`;
+    setAchToast(msg);
+    window.setTimeout(() => setAchToast((m) => (m === msg ? null : m)), 2400);
+    sound.levelClear();
+  };
+
+  // Relic-ownership achievements (full-house / stacking) as the deck changes.
+  useEffect(() => {
+    notifyAch(meta.recordDeck(deck.map((c) => c.id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deck]);
 
   useEffect(() => {
     if (!dict) loadDictionary().then(setDict);
@@ -254,6 +275,12 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setFly({ id: Date.now(), total });
     buzz(goldHit ? [0, 14, 22, 14] : 12); // a little pulse on every word; a richer one on gold
     sound.found(Math.min(11, Math.round(total / 40) + 1));
+    // Stats + achievements for this word (length, score, rare letters, and the
+    // run's permanent mult after committing it).
+    notifyAch([
+      ...meta.recordWord(b.props.len, total, b.props.rareLetters),
+      ...meta.recordMult(run.permaMult + b.permaMultAdd),
+    ]);
     // Hands: spend a play. The board ends when plays run out (or after a one-word
     // boss's single word). Beating the target banks it; missing it ends the run.
     const remainingPlays = playsLeft - 1;
@@ -370,9 +397,10 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     ending.current = true;
     if (boardIdx > bestDepth.current) {
       bestDepth.current = boardIdx;
-      localStorage.setItem("lexicon:bestDepth", String(boardIdx));
       setNewRecord(true);
     }
+    // Persist depth + score + any end-of-run achievements.
+    meta.recordRunEnd(boardIdx, runScore);
     setPhase("dead");
     sound.timeUp();
   };
@@ -382,6 +410,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const clearBoard = () => {
     if (ending.current) return;
     ending.current = true;
+    notifyAch(meta.recordBoardCleared(boardIdx, !!boss));
     setCoins((c) => c + 5 + Math.min(5, Math.floor(c / 5)) + (boss ? 8 : 0));
     sound.levelClear();
     // Charm drop: a boss always yields one; regular boards sometimes — if a slot is free.
@@ -519,6 +548,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
       )}
 
       {charmToast && <div className="charm-toast" key={charmToast}>{charmToast}</div>}
+      {achToast && <div className="ach-toast" key={achToast}>{achToast} <span className="ach-toast-sub">unlocked</span></div>}
 
       {transmute && transmute.target === null && (
         <div className="charm-toast transmute-hint">🔀 Transmute · tap a tile to change it</div>
