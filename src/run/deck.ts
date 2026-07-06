@@ -109,16 +109,11 @@ export function duplicateLetterAt(deck: readonly Tile[], index: number): Tile[] 
   return t === undefined ? [...deck] : [...deck, t];
 }
 
-/** letter → count, for the deck viewer (sorted vowels-first then alpha). */
+/** letter → count, for the deck viewer (sorted A→Z; "qu" sorts into q's slot). */
 export function deckComposition(deck: readonly Tile[]): { letter: Tile; count: number }[] {
   const counts = new Map<Tile, number>();
   for (const t of deck) counts.set(t, (counts.get(t) ?? 0) + 1);
-  const isVowel = (l: string) => "aeiou".includes(l[0] ?? "");
   return [...counts.entries()]
     .map(([letter, count]) => ({ letter, count }))
-    .sort((a, b) => {
-      const va = isVowel(a.letter) ? 0 : 1;
-      const vb = isVowel(b.letter) ? 0 : 1;
-      return va !== vb ? va - vb : a.letter.localeCompare(b.letter);
-    });
+    .sort((a, b) => a.letter.localeCompare(b.letter));
 }

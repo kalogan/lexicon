@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { canExtend, pathWord, MIN_WORD_LEN } from "./board.js";
 import { readyDictionary, loadDictionary, type Dictionary } from "./dictionary.js";
 import { scoreWord, makeRunState, type RunState, type Card, type Breakdown } from "./run/engine.js";
-import { STARTER_DECK, DRAFT_POOL } from "./run/cards.js";
+import { DRAFT_POOL } from "./run/cards.js";
 import {
   STARTER_LETTER_DECK,
   makeBoardFromDeck,
@@ -38,7 +38,7 @@ import { AnteBanner, ChallengeWin, ChallengeLost } from "./ChallengeScreens.js";
 import { sound } from "./sound.js";
 import { music } from "./music.js";
 
-const SIZE = 5;
+const SIZE = 6;
 const PLAYS_PER_BLIND = 6;
 const DISCARDS_PER_BLIND = 3;
 const PRICE: Record<Card["rarity"], number> = { common: 4, uncommon: 6, rare: 8, legendary: 12 };
@@ -94,14 +94,17 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 
 export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   const [dict, setDict] = useState<Dictionary | null>(() => readyDictionary());
-  const [relics, setRelics] = useState<Card[]>(() => [...STARTER_DECK]);
+  // No free starter relics — you DRAFT your first relic (1 of 3) at the opening.
+  const [relics, setRelics] = useState<Card[]>(() => []);
   const [letters, setLetters] = useState<Tile[]>(() => [...STARTER_LETTER_DECK]);
   const [coins, setCoins] = useState(0);
   const [step, setStep] = useState(0); // which blind (0..TOTAL_BLINDS-1)
-  const [phase, setPhase] = useState<"draft" | "intro" | "play" | "shop" | "won" | "lost">("draft");
+  const [phase, setPhase] = useState<"draft" | "draftRelic" | "intro" | "play" | "shop" | "won" | "lost">("draft");
   // Opening draft: choose 5 of 10 offered letters to add to the base deck.
   const [offer] = useState(() => letterOffer(10));
   const [picked, setPicked] = useState<Set<number>>(() => new Set());
+  // Opening draft: choose 1 of 3 relics to seed your engine.
+  const [relicOffer] = useState(() => pickRelics(3).map((r) => r.card));
 
   const [boardSeed, setBoardSeed] = useState(() => Date.now());
   const board = useMemo(() => makeBoardFromDeck(letters, boardSeed, SIZE), [letters, boardSeed]);
@@ -161,10 +164,16 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [relics]);
 
-  // Opening draft → add the 5 chosen letters, then into the first ante.
+  // Opening draft → add the 5 chosen letters, then on to the relic pick.
   const confirmDraft = () => {
     const chosen = [...picked].map((i) => offer[i]!).filter(Boolean);
     setLetters((d) => [...d, ...chosen]);
+    setPhase("draftRelic");
+  };
+  // Relic pick → seed the run with the chosen relic, then into the first ante.
+  const chooseRelic = (card: Card) => {
+    setRelics([card]);
+    sound.relicShimmer();
     setPhase("intro");
   };
   const togglePick = (i: number) =>
@@ -349,8 +358,27 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
             ))}
           </div>
           <button className="btn primary" disabled={picked.size !== 5} onClick={confirmDraft}>
-            Add 5 &amp; begin →
+            Add 5 &amp; continue →
           </button>
+        </div>
+      </div>
+    );
+  }
+  if (phase === "draftRelic") {
+    return (
+      <div className="menu-veil">
+        <div className="ldraft-card">
+          <div className="menu-title">Choose your first relic</div>
+          <div className="confirm-sub">
+            One of three — the seed of your engine. You&rsquo;ll draft the rest from the shop between blinds.
+          </div>
+          <div className="relicdraft-row">
+            {relicOffer.map((c) => (
+              <button key={c.id} type="button" className="relicdraft-pick" onClick={() => chooseRelic(c)}>
+                <RelicCard card={c} mode="full" />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     );

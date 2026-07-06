@@ -1,41 +1,46 @@
 /**
- * music — LEXICON's procedural AMBIENT MUSIC bed (standalone Web Audio singleton).
+ * music — LEXICON's procedural MUSIC bed (standalone Web Audio singleton).
  *
  * ── WHAT THIS IS ─────────────────────────────────────────────────────────────
- * A warm, contemplative, slowly-evolving ambient loop that sits UNDER the game
- * as a background bed — lo-fi/ambient study-music energy: tasteful, hypnotic,
- * never distracting. It is fully SYNTHESIZED (oscillators + filters + gain
- * envelopes) — there are no audio asset files, no samples, and NO imports from
- * chimera or game-kit. Only the platform Web Audio API and the shared mute store.
+ * A cozy LO-FI STUDY BEAT — the "cozy scholar" vibe made musical. Where the old
+ * bed was a formless ambient pad wash, this is an actual tune with a pulse:
+ * a swung, brush-soft drum groove under warm Rhodes electric-piano chords, a
+ * round upright bass, a sparse vibraphone melody, and a little tape/vinyl warmth
+ * over the top. Think a jazzy lo-fi loop you'd leave on while reading — present
+ * and grooving, but never busy enough to distract from the words.
  *
- * It is completely separate from sound.ts: its OWN AudioContext + master gain,
- * so nothing is shared with the SFX bus. The only thing music and SFX share is
- * the MUTE preference (via ./store.js) so a single toggle silences both.
+ * It is fully SYNTHESIZED (oscillators + filtered noise + gain envelopes) — no
+ * audio asset files, no samples, and NO imports from chimera or game-kit. Only
+ * the platform Web Audio API and the shared mute store.
+ *
+ * It is completely separate from sound.ts: its OWN AudioContext + master bus, so
+ * nothing is shared with the SFX bus. The only thing music and SFX share is the
+ * MUTE preference (via ./store.js) so a single toggle silences both.
  *
  * ── MUSICAL DESIGN ──────────────────────────────────────────────────────────
- * Key of A minor, drifting toward a soft lydian brightness. A slow four-chord
- * progression — Am · F · C · G (i · VI · III · VII) — each chord held ~8 seconds
- * so it swells and blooms rather than strums. Each pad chord is three notes,
- * every note voiced by two slightly-DETUNED TRIANGLE oscillators through a gentle
- * LOWPASS filter for warmth (soft + felt, so it sits with the organic marimba/
- * bell SFX rather than buzzing against them), with a long attack/release so chords
- * breathe in and out with no hard edges. A shared, very slow LFO drifts the pad
- * cutoff for movement. Over the top sits a SPARSE melodic motif played on a soft
- * KALIMBA/MARIMBA pluck — the same voice family as the game's `found` chime
- * (fundamental + bright 4th harmonic + body octave, mallet attack, quick ring-out)
- * — drawn from the A-minor pentatonic (A C D E G) with lots of space, a few notes
- * per chord, never a busy lead. A subtle sub-bass sine pulses the root underneath. The whole thing is one
- * ~32-second phrase that loops seamlessly (the progression resolves G→Am so the
- * loop point lands warm), and a slow counter nudges melody-note selection each
- * cycle so successive loops are never quite identical.
+ * ~72 BPM, gently SWUNG eighths (the off-beat lands late), key of F major. An
+ * eight-bar loop over a warm jazzy turnaround —
+ *   Fmaj7 · Dm7 · Gm7 · C7 · Am7 · Dm7 · Gm7 · C7
+ * (I · vi · ii · V · iii · vi · ii · V — home is F, with a ii-V pull each half).
+ * One bar per chord. Voices:
+ *   • Rhodes EP — each chord a soft rolled stab (sine body + a bright 2×/4× "tine"
+ *     that decays fast, the signature electric-piano bell attack). A quieter
+ *     syncopated re-stab on the "and of three" some bars.
+ *   • Upright bass — round triangle+sub through a lowpass; root on beat one, a
+ *     fifth/octave on beat three, a little swing.
+ *   • Drums — a sine "pitch-drop" kick (1 and the & of 3), a filtered-noise brush
+ *     snare on the backbeat (2 and 4), and swung closed hats on the eighths.
+ *   • Vibraphone melody — sparse, seeded, a note or two per bar from the chord's
+ *     tones in the upper register, so successive loops are never identical.
+ *   • Tape warmth — the whole mix runs through a master lowpass (muffled, felt),
+ *     plus a few tiny vinyl crackle pops per bar for cozy texture.
  *
  * ── SCHEDULING ──────────────────────────────────────────────────────────────
  * A look-ahead scheduler: a setInterval wakes every ~25ms and schedules any
  * events whose start time falls within the next ~0.1s onto the audio clock, then
- * advances a playhead. Every voice is a THROWAWAY node graph (osc(s) + gain
- * [+ filter]) scheduled with absolute start/stop times; an `onended` handler
- * disconnects it so nothing leaks. We never hold one oscillator for the whole
- * song. stop() clears the interval (no more scheduling) and fades the master out.
+ * advances a playhead. Every voice is a THROWAWAY node graph scheduled with
+ * absolute start/stop times; an `onended` handler disconnects it so nothing
+ * leaks. stop() clears the interval and fades the master out.
  *
  * ── SAFETY ──────────────────────────────────────────────────────────────────
  * SSR / no-AudioContext safe: everything is guarded on `typeof window` and the
@@ -61,15 +66,23 @@ function getAudioContextCtor(): Ctor | null {
 
 // ── TIMING / STRUCTURE ────────────────────────────────────────────────────────
 
-/** Seconds each chord is held — long, so pads swell rather than strum. */
-const CHORD_SEC = 8;
-/** Chords in the progression. */
-const CHORD_COUNT = 4;
-/** One full loop's length in seconds (~32s). */
-const LOOP_SEC = CHORD_SEC * CHORD_COUNT;
+/** Beats per minute — an easy, heads-nodding lo-fi tempo. */
+const BPM = 72;
+/** Seconds per beat. */
+const SPB = 60 / BPM;
+/** Beats per bar (common time). */
+const BEATS_PER_BAR = 4;
+/** Seconds per bar. */
+const BAR_SEC = BEATS_PER_BAR * SPB;
+/** Bars in one full loop (the 8-chord turnaround). */
+const BARS = 8;
+/** One full loop's length in seconds (~26.7s). */
+const LOOP_SEC = BARS * BAR_SEC;
+/** Swing: where the off-beat eighth lands, as a fraction of a beat (>0.5 = late). */
+const SWING = 0.59;
 
-/** Master ceiling — a quiet background bed, well under the SFX bus. */
-const MASTER_CEILING = 0.15;
+/** Master ceiling — a warm background bed, under the SFX bus. */
+const MASTER_CEILING = 0.2;
 
 // ── SCHEDULER TUNING ──────────────────────────────────────────────────────────
 
@@ -80,95 +93,60 @@ const LOOKAHEAD_SEC = 0.1;
 
 // ── PITCHES ───────────────────────────────────────────────────────────────────
 
-/**
- * Equal-tempered frequencies we use, named by note+octave. A-minor palette plus
- * the pad-chord tones and a couple of sub-bass roots.
- */
-const HZ = {
-  // Sub-bass roots (one per chord).
-  A1: 55.0,
-  F1: 43.65,
-  C2: 65.41,
-  G1: 49.0,
-  // Pad register (mid).
-  A2: 110.0,
-  C3: 130.81,
-  E3: 164.81,
-  F2: 87.31,
-  A3: 220.0,
-  G2: 98.0,
-  B2: 123.47,
-  D3: 146.83,
-  // Melody register (A-minor pentatonic across two octaves).
-  A4: 440.0,
-  C5: 523.25,
-  D5: 587.33,
-  E5: 659.25,
-  G5: 783.99,
-  A5: 880.0,
-} as const;
+/** Equal-tempered frequency for a MIDI note number (A4 = 69 = 440Hz). */
+const hz = (midi: number): number => 440 * Math.pow(2, (midi - 69) / 12);
 
-/** One chord: three pad tones + its sub-bass root + which melody notes are OK. */
+/** One chord in the turnaround: a Rhodes voicing, a bass root, a melody pool. */
 interface Chord {
-  /** The three pad-chord frequencies (mid register). */
-  pad: [number, number, number];
-  /** Sub-bass root pulsed under the chord. */
-  sub: number;
-  /** Pentatonic melody notes that sit well over this chord. */
-  scale: number[];
+  /** Rhodes voicing — MIDI notes, mid register (around C4 = 60). */
+  notes: number[];
+  /** Bass root — MIDI note, low register. */
+  bass: number;
+  /** Consonant melody notes (MIDI, upper register) for the vibraphone. */
+  mel: number[];
 }
 
 /**
- * The progression: Am · F · C · G (i · VI · III · VII in A minor). Voiced close
- * so the pad moves smoothly, and each chord carries a small pool of consonant
- * melody notes.
+ * The eight-bar turnaround in F major: Fmaj7 · Dm7 · Gm7 · C7 · Am7 · Dm7 · Gm7 · C7.
+ * Voiced close so the Rhodes moves smoothly; each chord carries a small pool of
+ * consonant upper-register melody notes.
  */
 const PROGRESSION: readonly Chord[] = [
-  // Am — A C E
-  { pad: [HZ.A2, HZ.C3, HZ.E3], sub: HZ.A1, scale: [HZ.A4, HZ.C5, HZ.E5, HZ.A5] },
-  // F — F A C
-  { pad: [HZ.F2, HZ.A2, HZ.C3], sub: HZ.F1, scale: [HZ.C5, HZ.D5, HZ.A4, HZ.G5] },
-  // C — C E G
-  { pad: [HZ.C3, HZ.E3, HZ.G2], sub: HZ.C2, scale: [HZ.C5, HZ.E5, HZ.G5, HZ.D5] },
-  // G — G B D
-  { pad: [HZ.G2, HZ.B2, HZ.D3], sub: HZ.G1, scale: [HZ.D5, HZ.E5, HZ.G5, HZ.A5] },
+  // Fmaj7 — F A C E
+  { notes: [53, 57, 60, 64], bass: 41, mel: [72, 76, 77, 81] },
+  // Dm7 — D F A C
+  { notes: [50, 53, 57, 60], bass: 38, mel: [74, 77, 81, 72] },
+  // Gm7 — G Bb D F
+  { notes: [55, 58, 62, 65], bass: 43, mel: [74, 77, 79, 82] },
+  // C7 — C E G Bb
+  { notes: [48, 52, 55, 58], bass: 36, mel: [72, 76, 79, 82] },
+  // Am7 — A C E G
+  { notes: [57, 60, 64, 67], bass: 45, mel: [72, 76, 79, 81] },
+  // Dm7
+  { notes: [50, 53, 57, 60], bass: 38, mel: [74, 77, 81, 72] },
+  // Gm7
+  { notes: [55, 58, 62, 65], bass: 43, mel: [74, 77, 79, 82] },
+  // C7
+  { notes: [48, 52, 55, 58], bass: 36, mel: [72, 76, 79, 82] },
 ];
 
 // ── EVENT MODEL ───────────────────────────────────────────────────────────────
 
-/** A pad-chord voice: a detuned, filtered, slow-swelling sustained tone. */
-interface PadEvent {
-  kind: "pad";
+/** A scheduled musical event; kind selects the voice, fields tune it. */
+interface Event {
+  kind: "rhodes" | "bass" | "kick" | "snare" | "hat" | "lead" | "crackle";
   /** Start time within the loop (seconds). */
   at: number;
-  /** How long it sounds (seconds). */
-  dur: number;
-  freq: number;
-  gain: number;
+  /** Pitch (Hz) — pitched voices only. */
+  freq?: number;
+  /** How long it sounds (seconds) — for the longer voices. */
+  dur?: number;
+  /** Peak gain. */
+  gain?: number;
 }
-
-/** A soft plucked/blown melody note (triangle core + sine octave shimmer). */
-interface LeadEvent {
-  kind: "lead";
-  at: number;
-  dur: number;
-  freq: number;
-  gain: number;
-}
-
-/** A low, slow sub-bass swell under a chord. */
-interface SubEvent {
-  kind: "sub";
-  at: number;
-  dur: number;
-  freq: number;
-  gain: number;
-}
-
-type Event = PadEvent | LeadEvent | SubEvent;
 
 /**
- * Tiny deterministic PRNG (mulberry32) — seeded per loop so melody placement
+ * Tiny deterministic PRNG (mulberry32) — seeded per loop so melody/fill placement
  * varies loop-to-loop without ever using Math.random (keeps things reproducible
  * and prevents accidental clustering/clipping).
  */
@@ -183,56 +161,81 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/** Time (seconds within the loop) of a beat position in a bar. */
+const beatAt = (bar: number, beat: number): number => bar * BAR_SEC + beat * SPB;
+
 /**
- * Build ONE loop's worth of events, given a seed that varies the melody. Pads +
- * sub are fixed (the harmonic bed is stable); the lead motif is placed sparsely
- * with seeded jitter so successive loops feel alive, not copy-pasted.
+ * Build ONE loop's worth of events, given a seed that varies the melody + fills.
+ * The groove + harmony are stable; the vibraphone motif, ghost hits and crackle
+ * are placed with seeded jitter so successive loops feel alive, not copy-pasted.
  */
 function buildLoop(seed: number): Event[] {
   const rng = mulberry32(seed);
-  const events: Event[] = [];
+  const ev: Event[] = [];
 
-  for (let i = 0; i < CHORD_COUNT; i++) {
-    const chord = PROGRESSION[i];
-    const chordStart = i * CHORD_SEC;
-    // Overlap each chord slightly into the next so pads crossfade — no gaps at
-    // chord boundaries (and none at the loop seam, since attack/release are long).
-    const padDur = CHORD_SEC + 2.5;
+  for (let bar = 0; bar < BARS; bar++) {
+    const chord = PROGRESSION[bar % PROGRESSION.length]!;
 
-    // ── Pad: three detuned, filtered tones, held long and quiet.
-    for (const f of chord.pad) {
-      events.push({ kind: "pad", at: chordStart, dur: padDur, freq: f, gain: 0.09 });
+    // ── Rhodes: a soft, slightly-rolled chord stab on beat one.
+    chord.notes.forEach((m, idx) => {
+      ev.push({ kind: "rhodes", at: beatAt(bar, 0) + idx * 0.014, freq: hz(m), dur: 2.4, gain: 0.07 });
+    });
+    // A quieter syncopated re-stab on the "and of three" some bars, for lift.
+    if (rng() > 0.42) {
+      chord.notes.forEach((m, idx) => {
+        ev.push({ kind: "rhodes", at: beatAt(bar, 2 + SWING) + idx * 0.01, freq: hz(m), dur: 1.3, gain: 0.04 });
+      });
     }
 
-    // ── Sub-bass: one soft low swell per chord.
-    events.push({ kind: "sub", at: chordStart, dur: CHORD_SEC + 1, freq: chord.sub, gain: 0.11 });
+    // ── Upright bass: root on one, a fifth/octave on three (a touch of walk).
+    ev.push({ kind: "bass", at: beatAt(bar, 0), freq: hz(chord.bass), dur: 0.95, gain: 0.14 });
+    ev.push({
+      kind: "bass",
+      at: beatAt(bar, 2),
+      freq: hz(chord.bass + (rng() > 0.5 ? 12 : 7)),
+      dur: 0.75,
+      gain: 0.1,
+    });
 
-    // ── Lead: 1–2 sparse notes per chord, placed in the back half so they land
-    // as the pad has fully bloomed, with seeded pitch + timing so it evolves.
-    const noteCount = rng() > 0.45 ? 2 : 1;
-    for (let n = 0; n < noteCount; n++) {
-      // Spread notes across the chord's timespan, biased later.
-      const slot = (n + 1) / (noteCount + 1);
-      const jitter = (rng() - 0.5) * 1.2;
-      const at = chordStart + CHORD_SEC * (0.35 + slot * 0.5) + jitter;
-      const freq = chord.scale[Math.floor(rng() * chord.scale.length)];
-      // A kalimba/marimba pluck (matches the SFX), so shorter — it rings + decays.
-      const dur = 1.3 + rng() * 1.0;
-      events.push({ kind: "lead", at, dur, freq, gain: 0.14 });
+    // ── Drums: kick (1 + & of 3), backbeat brush-snare (2, 4), swung hats.
+    ev.push({ kind: "kick", at: beatAt(bar, 0), gain: 0.34 });
+    ev.push({ kind: "kick", at: beatAt(bar, 2 + SWING), gain: 0.3 });
+    if (rng() > 0.72) ev.push({ kind: "kick", at: beatAt(bar, 3 + SWING), gain: 0.24 });
+    ev.push({ kind: "snare", at: beatAt(bar, 1), gain: 0.13 });
+    ev.push({ kind: "snare", at: beatAt(bar, 3), gain: 0.13 });
+    for (let b = 0; b < BEATS_PER_BAR; b++) {
+      ev.push({ kind: "hat", at: beatAt(bar, b), gain: 0.05 });
+      ev.push({ kind: "hat", at: beatAt(bar, b + SWING), gain: 0.033 }); // swung, softer
+    }
+
+    // ── Vibraphone melody: sparse — 0–2 notes in the back half of the bar.
+    if (rng() > 0.4) {
+      const n = rng() > 0.62 ? 2 : 1;
+      for (let k = 0; k < n; k++) {
+        const beat = 1.5 + k * 1.3 + (rng() - 0.5) * 0.5;
+        const m = chord.mel[Math.floor(rng() * chord.mel.length)]!;
+        ev.push({ kind: "lead", at: beatAt(bar, beat), freq: hz(m), dur: 1.1 + rng() * 0.7, gain: 0.085 });
+      }
+    }
+
+    // ── Vinyl crackle: a few tiny pops per bar for cozy tape texture.
+    const pops = 1 + Math.floor(rng() * 3);
+    for (let p = 0; p < pops; p++) {
+      ev.push({ kind: "crackle", at: bar * BAR_SEC + rng() * BAR_SEC, gain: 0.015 + rng() * 0.02 });
     }
   }
 
-  return events;
+  return ev;
 }
 
 // ── THE SINGLETON ─────────────────────────────────────────────────────────────
 
 class Music {
   private ctx: AudioContext | null = null;
+  /** Voice bus — everything routes here; feeds the tape lowpass → destination. */
   private master: GainNode | null = null;
-  /** Output of the slow LFO driving pad filter cutoff (movement). The LFO osc
-   *  itself stays alive via this connection + the running context. */
-  private lfoGain: GainNode | null = null;
+  /** Reusable white-noise buffer for the drum/crackle voices. */
+  private noiseBuf: AudioBuffer | null = null;
 
   /** Scheduler interval id (undefined ⇒ not scheduling). */
   private interval: number | undefined;
@@ -279,7 +282,7 @@ class Music {
     const now = ctx.currentTime;
     this.master.gain.cancelScheduledValues(now);
     this.master.gain.setValueAtTime(0.0001, now);
-    this.master.gain.exponentialRampToValueAtTime(MASTER_CEILING, now + 1.5);
+    this.master.gain.exponentialRampToValueAtTime(MASTER_CEILING, now + 1.2);
 
     // Anchor the first loop just ahead of "now" and build its event queue.
     this.loopStart = now + 0.15;
@@ -305,7 +308,6 @@ class Music {
     const now = ctx.currentTime;
     try {
       master.gain.cancelScheduledValues(now);
-      // Anchor to the current value, then ease to near-silence over ~0.6s.
       const cur = Math.max(master.gain.value, 0.0001);
       master.gain.setValueAtTime(cur, now);
       master.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
@@ -324,7 +326,6 @@ class Music {
     if (m) {
       const wasWanted = this.wanted;
       this.stop();
-      // stop() clears `wanted`; keep the intent so a later unmute resumes.
       this.wanted = wasWanted;
     } else if (this.wanted) {
       this.start();
@@ -338,7 +339,7 @@ class Music {
 
   // ── INTERNALS ─────────────────────────────────────────────────────────────
 
-  /** Lazily create the context + master + LFO. Returns null if unavailable. */
+  /** Lazily create the context + master bus + tape lowpass + noise buffer. */
   private ensureContext(): AudioContext | null {
     if (this.ctx) return this.ctx;
     const Ctor = getAudioContextCtor();
@@ -351,28 +352,29 @@ class Music {
       return null;
     }
 
+    // Voice bus → tape lowpass (muffled lo-fi warmth) → destination.
     const master = ctx.createGain();
     master.gain.value = 0.0001;
-    master.connect(ctx.destination);
+    const tape = ctx.createBiquadFilter();
+    tape.type = "lowpass";
+    tape.frequency.value = 2600; // roll off the top so it feels warm/felt, not crisp
+    tape.Q.value = 0.5;
+    master.connect(tape);
+    tape.connect(ctx.destination);
 
-    // A shared slow filter LFO the pad voices tap for gentle cutoff drift. We
-    // keep it as a control-rate source: its output (Hz offset) is added to each
-    // pad filter's frequency AudioParam.
-    const lfo = ctx.createOscillator();
-    lfo.type = "sine";
-    lfo.frequency.value = 0.05; // one sweep per ~20s — very slow.
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 350; // +/- 350 Hz of cutoff movement.
-    lfo.connect(lfoGain);
-    try {
-      lfo.start();
-    } catch {
-      // Already started or unavailable — ignore.
+    // One second of white noise, reused by the drums + crackle.
+    const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    let s = 0x2f6e2b1;
+    for (let i = 0; i < data.length; i++) {
+      // cheap deterministic noise (no Math.random)
+      s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff;
+      data[i] = (s / 0x40000000 - 1) * 0.9;
     }
 
     this.ctx = ctx;
     this.master = master;
-    this.lfoGain = lfoGain;
+    this.noiseBuf = buf;
     return ctx;
   }
 
@@ -402,9 +404,8 @@ class Music {
 
     const horizon = ctx.currentTime + LOOKAHEAD_SEC;
 
-    // Schedule everything from the current loop whose absolute start is due.
     while (this.qi < this.queue.length) {
-      const e = this.queue[this.qi];
+      const e = this.queue[this.qi]!;
       const absAt = this.loopStart + e.at;
       if (absAt > horizon) break;
       try {
@@ -415,7 +416,6 @@ class Music {
       this.qi++;
     }
 
-    // When we've scheduled past this loop's end, advance to the next loop.
     if (this.qi >= this.queue.length && this.loopStart + LOOP_SEC <= horizon) {
       this.loopStart += LOOP_SEC;
       this.loopIndex++;
@@ -426,161 +426,66 @@ class Music {
   /** Route one event to its voice builder. */
   private scheduleEvent(e: Event, at: number): void {
     switch (e.kind) {
-      case "pad":
-        this.playPad(e, at);
+      case "rhodes":
+        this.playRhodes(e, at);
+        break;
+      case "bass":
+        this.playBass(e, at);
+        break;
+      case "kick":
+        this.playKick(e, at);
+        break;
+      case "snare":
+        this.playSnare(e, at);
+        break;
+      case "hat":
+        this.playHat(e, at);
         break;
       case "lead":
-        this.playLead(e, at);
+        this.playLead(e, at, true);
         break;
-      case "sub":
-        this.playSub(e, at);
+      case "crackle":
+        this.playCrackle(e, at);
         break;
     }
   }
 
   // ── VOICES (throwaway node graphs, self-disconnecting on `ended`) ───────────
 
-  /**
-   * A warm pad tone: two detuned sawtooths through a lowpass filter (whose cutoff
-   * the shared LFO drifts), with a long swell in and long release out.
-   */
-  private playPad(e: PadEvent, at: number): void {
+  /** A one-shot noise burst through a filter — the drums' + crackle's engine. */
+  private playNoise(
+    at: number,
+    dur: number,
+    gain: number,
+    filter: { type: BiquadFilterType; freq: number; q?: number },
+    attack = 0.001,
+  ): void {
     const ctx = this.ctx;
     const master = this.master;
-    if (!ctx || !master) return;
+    if (!ctx || !master || !this.noiseBuf) return;
 
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 700; // warmer than before — softer, more felt
-    filter.Q.value = 0.4;
-    if (this.lfoGain) {
-      // Add LFO Hz offset onto the filter cutoff for slow movement.
-      this.lfoGain.connect(filter.frequency);
-    }
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    src.loop = true;
+    const biq = ctx.createBiquadFilter();
+    biq.type = filter.type;
+    biq.frequency.value = filter.freq;
+    biq.Q.value = filter.q ?? 0.8;
+    const g = ctx.createGain();
+    g.gain.value = 0.0001;
+    src.connect(biq);
+    biq.connect(g);
+    g.connect(master);
 
-    const gain = ctx.createGain();
-    gain.gain.value = 0.0001;
-    filter.connect(gain);
-    gain.connect(master);
+    const end = at + dur;
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(gain, at + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, end);
 
-    const attack = 2.2;
-    const release = 2.8;
-    const peak = e.gain;
-    const end = at + e.dur;
-    gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(peak, at + attack);
-    gain.gain.setValueAtTime(peak, Math.max(at + attack, end - release));
-    gain.gain.exponentialRampToValueAtTime(0.0001, end);
-
-    const oscs: OscillatorNode[] = [];
-    for (const detune of [-7, 7]) {
-      const osc = ctx.createOscillator();
-      // Warm triangle pads (was sawtooth) — softer + rounder, to sit with the
-      // organic marimba/bell SFX rather than buzz against them.
-      osc.type = "triangle";
-      osc.frequency.value = e.freq;
-      osc.detune.value = detune;
-      osc.connect(filter);
-      osc.start(at);
-      osc.stop(end + 0.05);
-      oscs.push(osc);
-    }
-
-    const cleanup = () => {
-      try {
-        if (this.lfoGain) this.lfoGain.disconnect(filter.frequency);
-      } catch {
-        /* already disconnected */
-      }
-      for (const o of oscs) {
-        try {
-          o.disconnect();
-        } catch {
-          /* ignore */
-        }
-      }
-      try {
-        filter.disconnect();
-      } catch {
-        /* ignore */
-      }
-      try {
-        gain.disconnect();
-      } catch {
-        /* ignore */
-      }
-    };
-    oscs[oscs.length - 1].onended = cleanup;
-  }
-
-  /**
-   * A soft melody note: a triangle core with a quiet sine an octave up so it
-   * blooms rather than snaps — gentle attack, exponential release.
-   */
-  private playLead(e: LeadEvent, at: number): void {
-    const ctx = this.ctx;
-    const master = this.master;
-    if (!ctx || !master) return;
-
-    // A soft KALIMBA/MARIMBA pluck (the same voice family as sound.ts `found`):
-    // a fundamental + a bright 4th harmonic (marimba's signature, decays fast) +
-    // a quiet body octave. Soft mallet attack, exponential ring-out.
-    const voice = (freq: number, gain: number, wave: OscillatorType, dur: number, attack: number) => {
-      const g = ctx.createGain();
-      g.gain.value = 0.0001;
-      g.connect(master);
-      const end = at + dur;
-      g.gain.setValueAtTime(0.0001, at);
-      g.gain.exponentialRampToValueAtTime(gain, at + attack);
-      g.gain.exponentialRampToValueAtTime(0.0001, end);
-      const osc = ctx.createOscillator();
-      osc.type = wave;
-      osc.frequency.value = freq;
-      osc.connect(g);
-      osc.start(at);
-      osc.stop(end + 0.05);
-      osc.onended = () => {
-        try {
-          osc.disconnect();
-          g.disconnect();
-        } catch {
-          /* ignore */
-        }
-      };
-    };
-
-    voice(e.freq, e.gain, "sine", e.dur, 0.008);
-    voice(e.freq * 4, e.gain * 0.3, "sine", e.dur * 0.4, 0.004);
-    voice(e.freq * 2, e.gain * 0.16, "triangle", e.dur * 0.7, 0.008);
-  }
-
-  /** A low, slow sub-bass swell under the chord — felt more than heard. */
-  private playSub(e: SubEvent, at: number): void {
-    const ctx = this.ctx;
-    const master = this.master;
-    if (!ctx || !master) return;
-
-    const gain = ctx.createGain();
-    gain.gain.value = 0.0001;
-    gain.connect(master);
-
-    const end = at + e.dur;
-    const attack = 1.8;
-    const release = 1.8;
-    gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(e.gain, at + attack);
-    gain.gain.setValueAtTime(e.gain, Math.max(at + attack, end - release));
-    gain.gain.exponentialRampToValueAtTime(0.0001, end);
-
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.value = e.freq;
-    osc.connect(gain);
-    osc.start(at);
-    osc.stop(end + 0.05);
-
-    osc.onended = () => {
-      for (const n of [osc, gain]) {
+    src.start(at);
+    src.stop(end + 0.02);
+    src.onended = () => {
+      for (const n of [src, biq, g]) {
         try {
           n.disconnect();
         } catch {
@@ -588,6 +493,159 @@ class Music {
         }
       }
     };
+  }
+
+  /**
+   * Rhodes electric-piano tone: a sine body plus bright 2×/4× "tine" partials that
+   * decay faster than the body — the signature EP bell attack, soft and warm.
+   */
+  private playRhodes(e: Event, at: number): void {
+    this.epVoice(at, e.freq ?? 220, e.dur ?? 2, e.gain ?? 0.07, false);
+  }
+
+  /** Vibraphone melody note — same EP engine, a touch brighter + longer ring. */
+  private playLead(e: Event, at: number, bright: boolean): void {
+    this.epVoice(at, e.freq ?? 440, e.dur ?? 1.3, e.gain ?? 0.085, bright);
+  }
+
+  /** Shared Rhodes/vibes engine: stacked sine partials with per-partial decay. */
+  private epVoice(at: number, freq: number, dur: number, gain: number, bright: boolean): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+
+    const partial = (mult: number, g: number, d: number, attack: number) => {
+      const out = ctx.createGain();
+      out.gain.value = 0.0001;
+      out.connect(master);
+      const end = at + d;
+      out.gain.setValueAtTime(0.0001, at);
+      out.gain.exponentialRampToValueAtTime(g, at + attack);
+      out.gain.exponentialRampToValueAtTime(0.0001, end);
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = freq * mult;
+      osc.connect(out);
+      osc.start(at);
+      osc.stop(end + 0.05);
+      osc.onended = () => {
+        try {
+          osc.disconnect();
+          out.disconnect();
+        } catch {
+          /* ignore */
+        }
+      };
+    };
+
+    partial(1, gain, dur, 0.006); // body
+    partial(2, gain * 0.34, dur * 0.5, 0.004); // tine (bell attack, faster decay)
+    partial(bright ? 4 : 3, gain * (bright ? 0.12 : 0.07), dur * 0.3, 0.003); // sparkle
+  }
+
+  /** Upright bass: a round triangle + sine sub through a lowpass. */
+  private playBass(e: Event, at: number): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+
+    const freq = e.freq ?? 55;
+    const dur = e.dur ?? 0.9;
+    const gain = e.gain ?? 0.14;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 480;
+    filter.Q.value = 0.7;
+    const out = ctx.createGain();
+    out.gain.value = 0.0001;
+    filter.connect(out);
+    out.connect(master);
+
+    const end = at + dur;
+    out.gain.setValueAtTime(0.0001, at);
+    out.gain.exponentialRampToValueAtTime(gain, at + 0.02);
+    out.gain.setValueAtTime(gain, Math.max(at + 0.02, end - 0.25));
+    out.gain.exponentialRampToValueAtTime(0.0001, end);
+
+    const oscs: OscillatorNode[] = [];
+    const tri = ctx.createOscillator();
+    tri.type = "triangle";
+    tri.frequency.value = freq;
+    tri.connect(filter);
+    oscs.push(tri);
+    const sub = ctx.createOscillator();
+    sub.type = "sine";
+    sub.frequency.value = freq;
+    const subG = ctx.createGain();
+    subG.gain.value = 0.6;
+    sub.connect(subG);
+    subG.connect(filter);
+    oscs.push(sub);
+
+    for (const o of oscs) {
+      o.start(at);
+      o.stop(end + 0.05);
+    }
+    oscs[0]!.onended = () => {
+      for (const n of [...oscs, subG, filter, out]) {
+        try {
+          n.disconnect();
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }
+
+  /** Kick: a sine with a fast downward pitch sweep + quick decay. */
+  private playKick(e: Event, at: number): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+
+    const gain = e.gain ?? 0.34;
+    const out = ctx.createGain();
+    out.gain.value = 0.0001;
+    out.connect(master);
+
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(120, at);
+    osc.frequency.exponentialRampToValueAtTime(44, at + 0.09);
+    osc.connect(out);
+
+    const end = at + 0.3;
+    out.gain.setValueAtTime(0.0001, at);
+    out.gain.exponentialRampToValueAtTime(gain, at + 0.006);
+    out.gain.exponentialRampToValueAtTime(0.0001, end);
+
+    osc.start(at);
+    osc.stop(end + 0.02);
+    osc.onended = () => {
+      for (const n of [osc, out]) {
+        try {
+          n.disconnect();
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }
+
+  /** Snare: a soft filtered-noise brush on the backbeat. */
+  private playSnare(e: Event, at: number): void {
+    this.playNoise(at, 0.17, e.gain ?? 0.13, { type: "bandpass", freq: 1750, q: 0.7 }, 0.002);
+  }
+
+  /** Closed hat: a very short high-passed noise tick. */
+  private playHat(e: Event, at: number): void {
+    this.playNoise(at, 0.035, e.gain ?? 0.05, { type: "highpass", freq: 7500, q: 0.8 });
+  }
+
+  /** Vinyl crackle: a tiny mid-band noise pop for tape texture. */
+  private playCrackle(e: Event, at: number): void {
+    this.playNoise(at, 0.02, e.gain ?? 0.02, { type: "bandpass", freq: 2200, q: 1.2 });
   }
 }
 

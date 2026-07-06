@@ -1073,6 +1073,30 @@ body,
   font-weight: 800;
 }
 
+/* Opening relic draft — pick 1 of 3, stacked so full cards stay readable. */
+.relicdraft-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+}
+.relicdraft-pick {
+  appearance: none;
+  border: 2px solid transparent;
+  background: transparent;
+  padding: 0;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.relicdraft-pick:hover,
+.relicdraft-pick:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--lex-accent-deep);
+  box-shadow: 0 10px 24px rgba(20, 14, 30, 0.22);
+  outline: none;
+}
+
 /* Abandon-run confirmation modal */
 .confirm-card {
   width: min(88vw, 340px);
