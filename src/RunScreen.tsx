@@ -32,7 +32,9 @@ const MAX_CHARMS = 3; // consumable slots
 // Hands: PLAYS are the primary per-board limiter (each word is a decision), with
 // the clock demoted to a comfortable safety net. DISCARDS reshuffle a dead board.
 const PLAYS_PER_BOARD = 6;
-const DISCARDS_PER_BOARD = 2;
+// Fresh-board reshuffles are a RUN-WIDE pool (not per-board): you get 3 for the
+// whole run and spend them where you need them most. They do not reset each board.
+const RESHUFFLES_PER_RUN = 3;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""); // Transmute letter picker
 // Target curve — retuned for the Hands model (only ~6 word-plays per board, vs the
 // old spam-many). Fewer words → lower bar, but it still climbs so a real engine is
@@ -110,7 +112,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const [timeLeft, setTimeLeft] = useState(() => TIME_BUDGET + (boardMod?.startTimeBonus ?? 0));
   // Hands: word-plays left this board (the primary limiter) + board reshuffles.
   const [playsLeft, setPlaysLeft] = useState(PLAYS_PER_BOARD);
-  const [discardsLeft, setDiscardsLeft] = useState(DISCARDS_PER_BOARD);
+  const [discardsLeft, setDiscardsLeft] = useState(RESHUFFLES_PER_RUN);
   const [path, setPath] = useState<number[]>([]);
   const [found, setFound] = useState<Set<string>>(() => new Set());
   // A real run opens with a 3-way choice; the first-ever run skips it (tutorial deck).
@@ -405,7 +407,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setBoardScore(0);
     setTimeLeft(TIME_BUDGET + (nextMod?.startTimeBonus ?? 0));
     setPlaysLeft(PLAYS_PER_BOARD);
-    setDiscardsLeft(DISCARDS_PER_BOARD);
+    // NOTE: discardsLeft is a run-wide pool — deliberately NOT reset per board.
     setFound(new Set());
     setDoubleNext(false); // per-board charm effects reset
     setSealsCleared(false);
@@ -535,6 +537,8 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
           className="discard-btn"
           disabled={phase !== "play" || discardsLeft <= 0 || !!transmute}
           onClick={discard}
+          title={`Fresh board — ${discardsLeft} left for the whole run`}
+          aria-label={`Fresh board — ${discardsLeft} reshuffles left for the whole run`}
         >
           ↻ {discardsLeft}
         </button>
