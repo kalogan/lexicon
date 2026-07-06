@@ -85,6 +85,8 @@ class SoundManager {
   private muted = false;
   /** True once we've decided the environment can never produce audio. */
   private unavailable = false;
+  /** Lazily-built white-noise buffer, reused for the filtered wooden clacks. */
+  private noiseBuf: AudioBuffer | null = null;
 
   constructor() {
     // Read the persisted preference eagerly so isMuted() is correct pre-unlock.
@@ -196,6 +198,76 @@ class SoundManager {
     osc.stop(now + dur + 0.02);
   }
 
+  /** Shared white-noise buffer (built once) — the raw material for clacks. */
+  private getNoise(ctx: AudioContext): AudioBuffer {
+    if (!this.noiseBuf) {
+      const len = Math.floor(ctx.sampleRate * 0.4);
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      this.noiseBuf = buf;
+    }
+    return this.noiseBuf;
+  }
+
+  /**
+   * A short burst of BAND/LOW-pass filtered noise — the organic, tactile layer
+   * (wooden tile-clacks, soft thuds). Same throwaway-node discipline as tone().
+   */
+  private noise(opts: {
+    type?: BiquadFilterType;
+    freq: number;
+    q?: number;
+    gain: number;
+    delay?: number;
+    attack?: number;
+    duration: number;
+  }): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    const now = ctx.currentTime + (opts.delay ?? 0);
+    const dur = opts.duration;
+    const attack = opts.attack ?? 0.001;
+
+    const src = ctx.createBufferSource();
+    src.buffer = this.getNoise(ctx);
+    const filt = ctx.createBiquadFilter();
+    filt.type = opts.type ?? "bandpass";
+    filt.frequency.value = opts.freq;
+    filt.Q.value = opts.q ?? 1;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.linearRampToValueAtTime(opts.gain, now + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+    src.connect(filt);
+    filt.connect(g);
+    g.connect(master);
+    src.onended = () => {
+      try {
+        src.disconnect();
+        filt.disconnect();
+        g.disconnect();
+      } catch {
+        /* already torn down */
+      }
+    };
+    src.start(now);
+    src.stop(now + dur + 0.02);
+  }
+
+  /**
+   * A woody MARIMBA/kalimba note: the fundamental plus a bright 4th harmonic (the
+   * marimba's signature) and a soft body octave, all with a quick pluck decay.
+   * The warm, tactile core of the "cozy scholar" palette.
+   */
+  private marimba(freq: number, gain: number, delay = 0, dur = 0.42): void {
+    this.tone({ wave: "sine", freq, gain, delay, attack: 0.002, duration: dur });
+    this.tone({ wave: "sine", freq: freq * 4, gain: gain * 0.34, delay, attack: 0.001, duration: dur * 0.45 });
+    this.tone({ wave: "triangle", freq: freq * 2, gain: gain * 0.16, delay, attack: 0.002, duration: dur * 0.7 });
+  }
+
   // ── PUBLIC SOUND PALETTE ───────────────────────────────────────────────────
 
   /**
@@ -205,7 +277,9 @@ class SoundManager {
    */
   tap(): void {
     if (!this.ready()) return;
-    this.tone({ wave: "triangle", freq: 660, gain: 0.06, attack: 0.002, duration: 0.05 });
+    // A soft wooden tile-clack: a quick band-passed noise tick + a low body knock.
+    this.noise({ type: "bandpass", freq: 1650, q: 1.3, gain: 0.05, duration: 0.032 });
+    this.tone({ wave: "triangle", freq: 216, gain: 0.045, attack: 0.001, duration: 0.05 });
   }
 
   /**
@@ -217,45 +291,33 @@ class SoundManager {
   found(points: number): void {
     if (!this.ready()) return;
 
-    // Clamp to the expected 1..11 range, then map to a pentatonic-ish ascent so
-    // consecutive point values still land on pleasant, in-key steps.
+    // Clamp to 1..11, map to a warm pentatonic ascent — the marimba climbs with
+    // the word's value: a woody bloom that gets brighter + fuller for a big find.
     const p = Math.max(1, Math.min(11, Math.round(points)));
-    // A warm C-major pentatonic ladder (C4..C6-ish), indexed by points.
-    const scale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
-    const semis = scale[Math.min(scale.length - 1, p - 1)];
-    const root = 392.0 * Math.pow(2, semis / 12); // base G4, climbing.
+    const scale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24]; // C-major pentatonic ladder
+    const semis = scale[Math.min(scale.length - 1, p - 1)]!;
+    const root = 261.63 * Math.pow(2, semis / 12); // C4, climbing (marimba register)
 
-    // Root note + a fifth above, arpeggiated slightly for a chime-like sparkle.
-    this.tone({ wave: "triangle", freq: root, gain: 0.16, attack: 0.004, duration: 0.34 });
-    this.tone({
-      wave: "sine",
-      freq: root * 1.5,
-      gain: 0.1,
-      delay: 0.05,
-      attack: 0.004,
-      duration: 0.3,
-    });
-    // Bigger words earn a shimmering octave on top — the "brighter for more".
+    // A woody marimba root + a warm fifth, lightly arpeggiated (the tactile core).
+    this.marimba(root, 0.17, 0, 0.44);
+    this.marimba(root * 1.5, 0.1, 0.05, 0.36);
+    // Bigger words bloom into a soft bell shimmer on top — the "payoff crunch".
     if (p >= 5) {
-      this.tone({
-        wave: "sine",
-        freq: root * 2,
-        gain: 0.07,
-        delay: 0.1,
-        attack: 0.004,
-        duration: 0.26,
-      });
+      this.tone({ wave: "sine", freq: root * 2, gain: 0.07, delay: 0.09, attack: 0.003, duration: 0.5 });
+    }
+    if (p >= 8) {
+      this.tone({ wave: "sine", freq: root * 3, gain: 0.035, delay: 0.12, attack: 0.003, duration: 0.42 });
     }
   }
 
   /**
-   * invalid — a soft, non-harsh "no" for a rejected/dead-end word. A short,
-   * low, downward triangle blip (a muted thud, not a buzzer) so it corrects
-   * gently without punishing the ear.
+   * invalid — a soft, non-harsh "no" for a rejected/dead-end word. A muted wooden
+   * thud (low-passed noise + a low downward knock), correcting gently, never a buzzer.
    */
   invalid(): void {
     if (!this.ready()) return;
-    this.tone({ wave: "triangle", freq: [180, 120], gain: 0.11, attack: 0.004, duration: 0.18 });
+    this.noise({ type: "lowpass", freq: 360, q: 0.7, gain: 0.09, duration: 0.12 });
+    this.tone({ wave: "triangle", freq: [150, 92], gain: 0.06, attack: 0.003, duration: 0.14 });
   }
 
   /**
@@ -317,11 +379,11 @@ class SoundManager {
    */
   levelClear(): void {
     if (!this.ready()) return;
-    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
-    notes.forEach((f, i) =>
-      this.tone({ wave: "sine", freq: f, gain: 0.1, delay: i * 0.12, attack: 0.01, duration: 0.6 }),
-    );
-    this.tone({ wave: "triangle", freq: 261.63, gain: 0.06, attack: 0.02, duration: 0.95 });
+    // A warm resolved marimba arpeggio (C–E–G–C) over a soft low root — cozy,
+    // accomplished, never loud.
+    const notes = [261.63, 329.63, 392.0, 523.25]; // C4 E4 G4 C5
+    notes.forEach((f, i) => this.marimba(f, 0.11, i * 0.11, 0.7));
+    this.tone({ wave: "triangle", freq: 130.81, gain: 0.06, attack: 0.02, duration: 1.0 });
   }
 
   /**
