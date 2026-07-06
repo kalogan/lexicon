@@ -301,6 +301,10 @@ export interface TitleScreenProps {
   /** Fired when any option is chosen, before the fade (e.g. a confirm sfx). */
   onSelect?: (option: MenuOption) => void;
   className?: string;
+  /** Content arrangement. 'center' (default) clusters the wordmark + options near
+   *  the bottom; 'split' pins the wordmark/subtitle to the top and stacks the
+   *  options as a full-width menu at the bottom (a common mobile main-menu look). */
+  layout?: 'center' | 'split';
 }
 
 /** A title screen: a slotted backdrop + wordmark + subtitle + a menu of options. */
@@ -316,6 +320,7 @@ export function TitleScreen({
   onFirstGesture,
   onSelect,
   className,
+  layout = 'center',
 }: TitleScreenProps) {
   const [opacity, setOpacity] = useState(0);
   const leaving = useRef(false);
@@ -346,6 +351,95 @@ export function TitleScreen({
     window.setTimeout(opt.onSelect, leaveDelayMs);
   };
 
+  const isSplit = layout === 'split';
+
+  const wordmark = (
+    <>
+      <div
+        style={{
+          fontSize: 'clamp(40px, 13vw, 84px)',
+          fontWeight: 800,
+          letterSpacing: '0.14em',
+          color: titleColor,
+          textShadow: '0 2px 0 rgba(255,255,255,0.5), 0 10px 30px rgba(43,36,64,0.22)',
+        }}
+      >
+        {title}
+      </div>
+      {subtitle && (
+        <div style={{ marginTop: 10, fontStyle: 'italic', color: '#6b5a44', fontSize: 'clamp(13px, 3.6vw, 18px)' }}>
+          {subtitle}
+        </div>
+      )}
+    </>
+  );
+
+  const renderButton = (opt: MenuOption) => (
+    <button
+      key={opt.label}
+      disabled={opt.disabled}
+      onClick={() => choose(opt)}
+      style={{
+        appearance: 'none',
+        border: '1px solid rgba(60,45,30,0.18)',
+        borderRadius: 'var(--title-btn-radius, 14px)',
+        padding: '14px 26px',
+        minHeight: 52,
+        width: isSplit ? '100%' : undefined,
+        font: 'inherit',
+        fontWeight: opt.primary ? 800 : 600,
+        cursor: opt.disabled ? 'default' : 'pointer',
+        opacity: opt.disabled ? 0.45 : 1,
+        touchAction: 'none',
+        userSelect: 'none',
+        boxShadow: '0 3px 10px rgba(43,36,64,0.16)',
+        background: opt.primary ? 'var(--title-accent, #e8a84c)' : 'var(--title-btn-bg, rgba(247,239,226,0.92))',
+        color: opt.primary ? 'var(--title-accent-fg, #3a2a14)' : 'var(--title-btn-fg, #4a3a24)',
+      }}
+    >
+      {opt.label}
+    </button>
+  );
+
+  if (isSplit) {
+    return (
+      <div
+        className={className}
+        onPointerDown={firstGesture}
+        style={{ ...fullscreen, justifyContent: 'space-between', opacity, transition: `opacity ${opacity ? fadeInMs : fadeOutMs}ms ease` }}
+      >
+        <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>{backdrop}</div>
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            textAlign: 'center',
+            marginTop: 'calc(9vh + env(safe-area-inset-top, 0px))',
+            padding: 16,
+          }}
+        >
+          {wordmark}
+        </div>
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            width: '100%',
+            maxWidth: 420,
+            margin: '0 auto',
+            padding: '0 24px',
+            marginBottom: 'calc(8vh + env(safe-area-inset-bottom, 0px))',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+          }}
+        >
+          {options.map(renderButton)}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={className}
@@ -354,48 +448,9 @@ export function TitleScreen({
     >
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>{backdrop}</div>
       <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', marginBottom: '10vh', padding: 16 }}>
-        <div
-          style={{
-            fontSize: 'clamp(40px, 13vw, 84px)',
-            fontWeight: 800,
-            letterSpacing: '0.14em',
-            color: titleColor,
-            textShadow: '0 2px 0 rgba(255,255,255,0.5), 0 10px 30px rgba(43,36,64,0.22)',
-          }}
-        >
-          {title}
-        </div>
-        {subtitle && (
-          <div style={{ marginTop: 10, fontStyle: 'italic', color: '#6b5a44', fontSize: 'clamp(13px, 3.6vw, 18px)' }}>
-            {subtitle}
-          </div>
-        )}
+        {wordmark}
         <div style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          {options.map((opt) => (
-            <button
-              key={opt.label}
-              disabled={opt.disabled}
-              onClick={() => choose(opt)}
-              style={{
-                appearance: 'none',
-                border: '1px solid rgba(60,45,30,0.18)',
-                borderRadius: 'var(--title-btn-radius, 14px)',
-                padding: '14px 26px',
-                minHeight: 52,
-                font: 'inherit',
-                fontWeight: opt.primary ? 800 : 600,
-                cursor: opt.disabled ? 'default' : 'pointer',
-                opacity: opt.disabled ? 0.45 : 1,
-                touchAction: 'none',
-                userSelect: 'none',
-                boxShadow: '0 3px 10px rgba(43,36,64,0.16)',
-                background: opt.primary ? 'var(--title-accent, #e8a84c)' : 'var(--title-btn-bg, rgba(247,239,226,0.92))',
-                color: opt.primary ? 'var(--title-accent-fg, #3a2a14)' : 'var(--title-btn-fg, #4a3a24)',
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
+          {options.map(renderButton)}
         </div>
       </div>
     </div>

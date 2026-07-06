@@ -121,9 +121,10 @@ const BACKDROP_CSS = `
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  /* a gentle vignette so tiles fade toward the wordmark area, keeping it legible */
-  -webkit-mask-image: radial-gradient(140% 120% at 50% 30%, #000 55%, transparent 100%);
-  mask-image: radial-gradient(140% 120% at 50% 30%, #000 55%, transparent 100%);
+  /* Split layout: title up top, menu at the bottom — so keep tiles vivid in the
+     empty center and fade them behind both text zones (top + bottom) for legibility. */
+  -webkit-mask-image: radial-gradient(118% 96% at 50% 50%, #000 40%, transparent 94%);
+  mask-image: radial-gradient(118% 96% at 50% 50%, #000 40%, transparent 94%);
 }
 
 .lex-bd__tile {

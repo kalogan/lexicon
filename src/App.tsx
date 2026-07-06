@@ -85,6 +85,7 @@ export function App() {
         titleColor="#2b2440"
         backdrop={<TitleBackdrop />}
         options={options}
+        layout="split"
       />
     );
   }
