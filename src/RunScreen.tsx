@@ -86,10 +86,12 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const firstRun = useRef(localStorage.getItem("lexicon:hasRun") !== "1");
   useEffect(() => {
     localStorage.setItem("lexicon:hasRun", "1");
-    meta.recordRunStart();
+    notifyAch(meta.recordRunStart());
     // Accumulate real play-time; flush it into the lifetime stat on unmount.
     const start = Date.now();
-    return () => meta.addTimePlayed((Date.now() - start) / 1000);
+    return () => {
+      meta.addTimePlayed((Date.now() - start) / 1000);
+    };
   }, []);
 
   const [dict, setDict] = useState<Dictionary | null>(() => readyDictionary());

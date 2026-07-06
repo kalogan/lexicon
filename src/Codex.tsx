@@ -236,6 +236,7 @@ function StatsTab() {
     ["Best single word", `${s.bestWordScore}`],
     ["Best mult", `×${(1 + s.bestMult).toFixed(1)}`],
     ["Bosses beaten", `${s.bossesBeaten}`],
+    ["Challenge wins", `${s.challengeWins}`],
   ];
 
   return (

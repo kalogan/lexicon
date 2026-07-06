@@ -30,6 +30,8 @@ export interface Stats {
   bossesBeaten: number;
   /** Total real seconds spent in a run. */
   timePlayed: number;
+  /** Challenge runs won (cleared the final boss). */
+  challengeWins: number;
 }
 
 const ZERO: Stats = {
@@ -42,6 +44,7 @@ const ZERO: Stats = {
   bestMult: 0,
   bossesBeaten: 0,
   timePlayed: 0,
+  challengeWins: 0,
 };
 
 interface Store {
@@ -105,6 +108,27 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   { id: "lexicographer", name: "Lexicographer", desc: "Play a 9+ letter word.", icon: "📚" },
   { id: "overkill", name: "Overkill", desc: "Score 500+ on a single word.", icon: "💥" },
   { id: "deep-diver", name: "Deep Diver", desc: "Reach board 10.", icon: "🌊" },
+  // ── Expansion (mixed difficulty) ──────────────────────────────────────────
+  { id: "warmup", name: "Warm-Up", desc: "Play 25 words.", icon: "📖" },
+  { id: "regular", name: "Regular", desc: "Start 5 runs.", icon: "🎲" },
+  { id: "first-session", name: "First Session", desc: "Play for 10 minutes.", icon: "⌛" },
+  { id: "double-trouble", name: "Double Trouble", desc: "Play a word with 2 rare letters (Q/X/J/Z).", icon: "💠" },
+  { id: "high-roller", name: "High Roller", desc: "Score 1,000 in a single run.", icon: "💰" },
+  { id: "vocabularian", name: "Vocabularian", desc: "Play 100 words.", icon: "🗂️" },
+  { id: "descent", name: "Descent", desc: "Reach board 8.", icon: "🪜" },
+  { id: "overclocked", name: "Overclocked", desc: "Reach ×8 mult in a run.", icon: "⚡" },
+  { id: "boss-rush", name: "Boss Rush", desc: "Beat 5 boss boards.", icon: "⚔️" },
+  { id: "dedicated", name: "Dedicated", desc: "Play for 1 hour.", icon: "⏰" },
+  { id: "curator", name: "Curator", desc: "Own 12 relics at once.", icon: "🏛️" },
+  { id: "nuke", name: "Nuke", desc: "Score 1,500 on a single word.", icon: "☄️" },
+  { id: "challenger", name: "Challenger", desc: "Win a Challenge run.", icon: "🏅" },
+  { id: "bookworm", name: "Bookworm", desc: "Play 500 words.", icon: "🐛" },
+  { id: "abyssal", name: "Abyssal", desc: "Reach board 15.", icon: "🌑" },
+  { id: "score-hunter", name: "Score Hunter", desc: "Score 5,000 in a single run.", icon: "🎯" },
+  { id: "runaway", name: "Runaway Engine", desc: "Reach ×15 mult in a run.", icon: "🌋" },
+  { id: "sesquipedalian", name: "Sesquipedalian", desc: "Play a 12-letter word.", icon: "📏" },
+  { id: "nemesis", name: "Nemesis", desc: "Beat 20 boss boards.", icon: "👹" },
+  { id: "obsessed", name: "Obsessed", desc: "Play for 5 hours.", icon: "🕰️" },
 ];
 
 /** Mark ids unlocked in the store (mutates), returning the ones NEW this call. */
@@ -115,18 +139,35 @@ function unlock(store: Store, ids: string[]): string[] {
   return fresh;
 }
 
-export function recordRunStart(): void {
+export function recordRunStart(): string[] {
   const s = read();
   s.stats.runs += 1;
+  const fresh = unlock(s, s.stats.runs >= 5 ? ["regular"] : []);
   write(s);
+  return fresh;
 }
 
 /** Add real seconds of play (called as a run session ends). Never negative. */
-export function addTimePlayed(seconds: number): void {
-  if (!(seconds > 0)) return;
+export function addTimePlayed(seconds: number): string[] {
+  if (!(seconds > 0)) return [];
   const s = read();
   s.stats.timePlayed += Math.round(seconds);
+  const fresh = unlock(s, [
+    ...(s.stats.timePlayed >= 600 ? ["first-session"] : []),
+    ...(s.stats.timePlayed >= 3600 ? ["dedicated"] : []),
+    ...(s.stats.timePlayed >= 18000 ? ["obsessed"] : []),
+  ]);
   write(s);
+  return fresh;
+}
+
+/** A Challenge run was WON (cleared the final boss). */
+export function recordChallengeWin(): string[] {
+  const s = read();
+  s.stats.challengeWins += 1;
+  const fresh = unlock(s, ["challenger"]);
+  write(s);
+  return fresh;
 }
 
 /** A word was scored. len + rareLetters from its props; score is the final total. */
@@ -138,8 +179,14 @@ export function recordWord(len: number, score: number, rareLetters: number): str
   const fresh = unlock(s, [
     ...(len >= 6 ? ["wordsmith"] : []),
     ...(len >= 9 ? ["lexicographer"] : []),
+    ...(len >= 12 ? ["sesquipedalian"] : []),
     ...(rareLetters > 0 ? ["rare-air"] : []),
+    ...(rareLetters >= 2 ? ["double-trouble"] : []),
     ...(score >= 500 ? ["overkill"] : []),
+    ...(score >= 1500 ? ["nuke"] : []),
+    ...(s.stats.totalWords >= 25 ? ["warmup"] : []),
+    ...(s.stats.totalWords >= 100 ? ["vocabularian"] : []),
+    ...(s.stats.totalWords >= 500 ? ["bookworm"] : []),
   ]);
   write(s);
   return fresh;
@@ -149,7 +196,11 @@ export function recordWord(len: number, score: number, rareLetters: number): str
 export function recordMult(permaMult: number): string[] {
   const s = read();
   s.stats.bestMult = Math.max(s.stats.bestMult, permaMult);
-  const fresh = unlock(s, permaMult >= 4 ? ["engine-builder"] : []);
+  const fresh = unlock(s, [
+    ...(permaMult >= 4 ? ["engine-builder"] : []),
+    ...(permaMult >= 7 ? ["overclocked"] : []), // ×8
+    ...(permaMult >= 14 ? ["runaway"] : []), // ×15
+  ]);
   write(s);
   return fresh;
 }
@@ -157,7 +208,12 @@ export function recordMult(permaMult: number): string[] {
 export function recordBoardCleared(_boardIdx: number, boss: boolean): string[] {
   const s = read();
   if (boss) s.stats.bossesBeaten += 1;
-  const fresh = unlock(s, ["first-steps", ...(boss ? ["giant-slayer"] : [])]);
+  const fresh = unlock(s, [
+    "first-steps",
+    ...(boss ? ["giant-slayer"] : []),
+    ...(s.stats.bossesBeaten >= 5 ? ["boss-rush"] : []),
+    ...(s.stats.bossesBeaten >= 20 ? ["nemesis"] : []),
+  ]);
   write(s);
   return fresh;
 }
@@ -168,7 +224,11 @@ export function recordRunEnd(depth: number, score: number): string[] {
   s.stats.bestScore = Math.max(s.stats.bestScore, score);
   const fresh = unlock(s, [
     ...(depth >= 6 ? ["survivor"] : []),
+    ...(depth >= 8 ? ["descent"] : []),
     ...(depth >= 10 ? ["deep-diver"] : []),
+    ...(depth >= 15 ? ["abyssal"] : []),
+    ...(score >= 1000 ? ["high-roller"] : []),
+    ...(score >= 5000 ? ["score-hunter"] : []),
   ]);
   write(s);
   return fresh;
@@ -182,6 +242,7 @@ export function recordDeck(ids: readonly string[]): string[] {
   const maxCopies = counts.size ? Math.max(...counts.values()) : 0;
   const fresh = unlock(s, [
     ...(ids.length >= 8 ? ["full-house"] : []),
+    ...(ids.length >= 12 ? ["curator"] : []),
     ...(maxCopies >= 3 ? ["stacker"] : []),
   ]);
   write(s);

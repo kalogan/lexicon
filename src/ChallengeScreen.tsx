@@ -32,6 +32,7 @@ import {
   type Blind,
 } from "./run/challenge.js";
 import { RelicCard } from "./RelicCard.js";
+import * as meta from "./meta.js";
 import { ChallengeShop, type ShopRelic } from "./ChallengeShop.js";
 import { AnteBanner, ChallengeWin, ChallengeLost } from "./ChallengeScreens.js";
 import { sound } from "./sound.js";
@@ -115,6 +116,7 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   const [fly, setFly] = useState<{ id: number; total: number } | null>(null);
   const [shopStock, setShopStock] = useState<ShopRelic[]>([]);
   const [inspect, setInspect] = useState<Card | null>(null);
+  const [achToast, setAchToast] = useState<string | null>(null);
 
   const tracing = useRef(false);
   const ending = useRef(false);
@@ -132,6 +134,32 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     music.start();
     return () => music.stop();
   }, []);
+
+  // Surface a freshly-unlocked achievement as a toast.
+  const notifyAch = (fresh: string[]) => {
+    if (!fresh.length) return;
+    const a = meta.ACHIEVEMENTS.find((x) => x.id === fresh[0]);
+    if (!a) return;
+    const msg = `🏆 ${a.name}`;
+    setAchToast(msg);
+    window.setTimeout(() => setAchToast((m) => (m === msg ? null : m)), 2400);
+    sound.levelClear();
+  };
+
+  // Meta/achievements: count this Challenge run + flush play-time on unmount.
+  useEffect(() => {
+    notifyAch(meta.recordRunStart());
+    const start = Date.now();
+    return () => {
+      meta.addTimePlayed((Date.now() - start) / 1000);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Relic-ownership achievements (full-house / curator / stacking) as relics change.
+  useEffect(() => {
+    notifyAch(meta.recordDeck(relics.map((c) => c.id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [relics]);
 
   // Opening draft → add the 5 chosen letters, then into the first ante.
   const confirmDraft = () => {
@@ -167,6 +195,7 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     setCoins((c) => c + blind.reward + interest);
     sound.levelClear();
     if (isWin(step + 1)) {
+      meta.recordChallengeWin(); // 🏅 Challenger (the win screen is the celebration)
       setPhase("won"); // cleared the final boss
       return;
     }
@@ -223,6 +252,10 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     buzz(12);
     sound.found(Math.min(11, Math.round(total / 40) + 1));
     if (b.triggers.length > 0) sound.relicShimmer();
+    notifyAch([
+      ...meta.recordWord(b.props.len, total, b.props.rareLetters),
+      ...meta.recordMult(run.permaMult + b.permaMultAdd),
+    ]);
 
     const remaining = playsLeft - 1;
     setPlaysLeft(remaining);
@@ -420,6 +453,8 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
           <span className="bd-hint">trace a word — dealt from your deck</span>
         )}
       </div>
+
+      {achToast && <div className="ach-toast" key={achToast}>{achToast} <span className="ach-toast-sub">unlocked</span></div>}
 
       {inspect && (
         <div className="menu-veil" onClick={() => setInspect(null)}>
