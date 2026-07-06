@@ -711,6 +711,60 @@ body,
   cursor: default;
 }
 
+/* Board modifier banner — a per-board twist (boon = green, twist = amber).
+   Deliberately lighter than the boss banner: a flavor beat, not a threat. */
+.mod-banner {
+  width: min(92vw, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+  border-radius: 14px;
+  animation: pop-in 0.35s ease;
+}
+.mod-banner.mod-boon {
+  background: linear-gradient(90deg, rgba(78, 154, 112, 0.18), rgba(78, 154, 112, 0.05));
+  border: 1px solid rgba(78, 154, 112, 0.42);
+}
+.mod-banner.mod-twist {
+  background: linear-gradient(90deg, rgba(217, 138, 61, 0.18), rgba(217, 138, 61, 0.05));
+  border: 1px solid rgba(217, 138, 61, 0.42);
+}
+.mod-name {
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  font-size: 14px;
+}
+.mod-boon .mod-name { color: var(--lex-ok); }
+.mod-twist .mod-name { color: var(--lex-accent-deep); }
+.mod-blurb {
+  font-size: 12px;
+  color: var(--lex-ink);
+}
+
+/* The gold tile (Golden Tile modifier) — a lit gate that ×-boosts words through it */
+.tile.gold {
+  background: linear-gradient(160deg, #fbe7a8 0%, #f3c65a 55%, #e0a838 100%);
+  color: #5a4310;
+  box-shadow:
+    0 0 0 2px rgba(224, 168, 56, 0.7),
+    0 0 16px rgba(243, 198, 90, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  animation: gold-pulse 1.9s ease-in-out infinite;
+}
+.tile.gold.on {
+  box-shadow:
+    0 0 0 3px rgba(224, 168, 56, 0.95),
+    0 0 22px rgba(243, 198, 90, 0.95);
+}
+@keyframes gold-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(224,168,56,0.7), 0 0 12px rgba(243,198,90,0.6), inset 0 1px 0 rgba(255,255,255,0.6); }
+  50% { box-shadow: 0 0 0 2px rgba(224,168,56,0.9), 0 0 20px rgba(243,198,90,0.9), inset 0 1px 0 rgba(255,255,255,0.6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile.gold { animation: none; }
+}
+
 /* The shop — a distinct "vault" panel so it doesn't read like the draft */
 .shop-card {
   width: min(94vw, 560px);

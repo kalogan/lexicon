@@ -11,6 +11,7 @@ import { readyDictionary, loadDictionary, type Dictionary } from "./dictionary.j
 import { scoreWord, makeRunState, type RunState, type Card, type Breakdown } from "./run/engine.js";
 import { STARTER_DECK, TUTORIAL_DECK, DRAFT_POOL } from "./run/cards.js";
 import { randomBoss, type Boss } from "./run/bosses.js";
+import { randomModifier, goldCell, type BoardMod } from "./run/modifiers.js";
 import { RelicCard } from "./RelicCard.js";
 import { sound } from "./sound.js";
 import { music } from "./music.js";
@@ -77,9 +78,14 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const [boardIdx, setBoardIdx] = useState(1);
   const [boardSeed, setBoardSeed] = useState(() => Date.now());
   const board: Board = useMemo(() => makeBoard(boardSeed, SIZE), [boardSeed]);
+  // Board modifier — a per-board twist on regular boards (a boss takes the slot
+  // instead). The first-ever (tutorial) board stays plain so the snowball reads clean.
+  const [boardMod, setBoardMod] = useState<BoardMod | null>(() =>
+    firstRun.current ? null : randomModifier(boardSeed),
+  );
   const [boardScore, setBoardScore] = useState(0);
   const [runScore, setRunScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(TIME_BUDGET);
+  const [timeLeft, setTimeLeft] = useState(() => TIME_BUDGET + (boardMod?.startTimeBonus ?? 0));
   const [path, setPath] = useState<number[]>([]);
   const [found, setFound] = useState<Set<string>>(() => new Set());
   // A real run opens with a 3-way choice; the first-ever run skips it (tutorial deck).
@@ -95,6 +101,17 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const [fly, setFly] = useState<{ id: number; total: number } | null>(null);
   const [boss, setBoss] = useState<Boss | null>(null);
   const blocked = useMemo(() => new Set(boss?.blocked?.(SIZE, boardSeed) ?? []), [boss, boardSeed]);
+  // Gold tile — a modifier can light one cell; a word tracing through it scores ×goldMult.
+  const goldTile = useMemo(
+    () => (boardMod?.goldTile && !boss ? goldCell(SIZE, boardSeed, blocked) : -1),
+    [boardMod, boss, boardSeed, blocked],
+  );
+  const goldMult = boardMod?.goldMult ?? 2;
+  // The modifier's transient scoring card rides along with the deck, this board only.
+  const effectiveDeck = useMemo(
+    () => (boardMod?.card ? [...deck, boardMod.card] : deck),
+    [deck, boardMod],
+  );
   // Tap a relic to inspect it (rules + live accrued value).
   const [inspect, setInspect] = useState<Card | null>(null);
   // Meta: deepest board ever reached (persists across runs).
@@ -160,10 +177,16 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
       buzz([0, 22, 40, 22]);
       return;
     }
-    const b = scoreWord(word, deck, run);
+    const raw = scoreWord(word, effectiveDeck, run);
+    // Gold tile: a word tracing through the lit cell scores ×goldMult this board.
+    const goldHit = goldTile >= 0 && cur.includes(goldTile);
+    const total = goldHit ? Math.round(raw.total * goldMult) : raw.total;
+    const b: Breakdown = goldHit
+      ? { ...raw, total, triggers: [...raw.triggers, { card: "Golden Tile", detail: `×${goldMult}` }] }
+      : raw;
     setFound((f) => new Set(f).add(word));
-    setBoardScore((s) => s + b.total);
-    setRunScore((s) => s + b.total);
+    setBoardScore((s) => s + total);
+    setRunScore((s) => s + total);
     setTimeLeft((t) => t + b.timeGain);
     setRun((r) => commit(r, b));
     setToast(b);
@@ -171,12 +194,12 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     // Juice: glow the relics that fired + fly the score up.
     setFlash(new Set(b.triggers.map((t) => t.card)));
     window.setTimeout(() => setFlash(new Set()), 720);
-    setFly({ id: Date.now(), total: b.total });
-    buzz(12); // a little pulse on every word
-    sound.found(Math.min(11, Math.round(b.total / 40) + 1));
+    setFly({ id: Date.now(), total });
+    buzz(goldHit ? [0, 14, 22, 14] : 12); // a little pulse on every word; a richer one on gold
+    sound.found(Math.min(11, Math.round(total / 40) + 1));
     // One-word boss: this single word decides the board.
     if (boss?.oneWord) {
-      const survived = boardScore + b.total >= target;
+      const survived = boardScore + total >= target;
       window.setTimeout(() => {
         if (survived) clearBoard();
         else die();
@@ -192,11 +215,15 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const advanceBoard = () => {
     const nb = boardIdx + 1;
     const newSeed = Date.now();
+    const isBoss = nb % 6 === 0;
+    const nextBoss = isBoss ? randomBoss(newSeed) : null; // a boss every 6th board
+    const nextMod = isBoss ? null : randomModifier(newSeed); // a twist on some regular boards
     setBoardIdx(nb);
     setBoardSeed(newSeed);
-    setBoss(nb % 6 === 0 ? randomBoss(newSeed) : null); // a boss every 6th board
+    setBoss(nextBoss);
+    setBoardMod(nextMod);
     setBoardScore(0);
-    setTimeLeft(TIME_BUDGET);
+    setTimeLeft(TIME_BUDGET + (nextMod?.startTimeBonus ?? 0));
     setFound(new Set());
     setRun((r) => ({ ...r, board: r.board + 1, boardWords: 0, lastFirst: null }));
     setPhase("play");
@@ -252,8 +279,15 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   };
 
   const cur = pathWord(path, board);
-  const preview =
-    cur.length >= MIN_WORD_LEN && dict && dict.has(cur) && !found.has(cur) ? scoreWord(cur, deck, run) : null;
+  const previewRaw =
+    cur.length >= MIN_WORD_LEN && dict && dict.has(cur) && !found.has(cur) ? scoreWord(cur, effectiveDeck, run) : null;
+  // Reflect the gold tile in the live preview when the current trace crosses it.
+  const previewGold = !!previewRaw && goldTile >= 0 && path.includes(goldTile);
+  const preview = previewRaw
+    ? previewGold
+      ? { ...previewRaw, total: Math.round(previewRaw.total * goldMult) }
+      : previewRaw
+    : null;
   const pct = Math.min(100, Math.round((boardScore / target) * 100));
   const inspectAccrued = inspect?.accrued?.(run) ?? null;
 
@@ -309,6 +343,13 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
         </div>
       )}
 
+      {boardMod && phase === "play" && !boss && (
+        <div className={`mod-banner mod-${boardMod.tone}`}>
+          <span className="mod-name">{boardMod.tone === "boon" ? "✦" : "✧"} {boardMod.name}</span>
+          <span className="mod-blurb">{boardMod.blurb}</span>
+        </div>
+      )}
+
       {/* Live breakdown / toast */}
       <div className="breakdown">
         {toast ? (
@@ -347,11 +388,12 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
           {board.cells.map((c, i) => {
             const order = path.indexOf(i);
             const isBlocked = blocked.has(i);
+            const isGold = i === goldTile;
             return (
               <div
                 key={i}
                 data-cell={i}
-                className={`tile${order >= 0 ? " on" : ""}${order === path.length - 1 ? " head" : ""}${isBlocked ? " blocked" : ""}`}
+                className={`tile${order >= 0 ? " on" : ""}${order === path.length - 1 ? " head" : ""}${isBlocked ? " blocked" : ""}${isGold ? " gold" : ""}`}
                 style={{ ["--i" as string]: i }}
               >
                 {isBlocked ? "" : c.label}
