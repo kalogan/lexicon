@@ -16,14 +16,15 @@
  * Key of A minor, drifting toward a soft lydian brightness. A slow four-chord
  * progression — Am · F · C · G (i · VI · III · VII) — each chord held ~8 seconds
  * so it swells and blooms rather than strums. Each pad chord is three notes,
- * every note voiced by two slightly-DETUNED sawtooth oscillators run through a
- * gentle LOWPASS filter for warmth, with a long attack/release so chords breathe
- * in and out of each other with no hard edges. A shared, very slow LFO drifts the
- * pad filter cutoff up and down across the whole loop for movement. Over the top
- * sits a SPARSE melodic motif on a soft triangle+sine voice, drawn from the
- * A-minor pentatonic (A C D E G) and placed with lots of space — a few notes per
- * chord, never a busy lead — plus a barely-there octave shimmer. A subtle
- * sub-bass sine pulses the root of each chord underneath. The whole thing is one
+ * every note voiced by two slightly-DETUNED TRIANGLE oscillators through a gentle
+ * LOWPASS filter for warmth (soft + felt, so it sits with the organic marimba/
+ * bell SFX rather than buzzing against them), with a long attack/release so chords
+ * breathe in and out with no hard edges. A shared, very slow LFO drifts the pad
+ * cutoff for movement. Over the top sits a SPARSE melodic motif played on a soft
+ * KALIMBA/MARIMBA pluck — the same voice family as the game's `found` chime
+ * (fundamental + bright 4th harmonic + body octave, mallet attack, quick ring-out)
+ * — drawn from the A-minor pentatonic (A C D E G) with lots of space, a few notes
+ * per chord, never a busy lead. A subtle sub-bass sine pulses the root underneath. The whole thing is one
  * ~32-second phrase that loops seamlessly (the progression resolves G→Am so the
  * loop point lands warm), and a slow counter nudges melody-note selection each
  * cycle so successive loops are never quite identical.
@@ -215,8 +216,9 @@ function buildLoop(seed: number): Event[] {
       const jitter = (rng() - 0.5) * 1.2;
       const at = chordStart + CHORD_SEC * (0.35 + slot * 0.5) + jitter;
       const freq = chord.scale[Math.floor(rng() * chord.scale.length)];
-      const dur = 2.4 + rng() * 1.6;
-      events.push({ kind: "lead", at, dur, freq, gain: 0.13 });
+      // A kalimba/marimba pluck (matches the SFX), so shorter — it rings + decays.
+      const dur = 1.3 + rng() * 1.0;
+      events.push({ kind: "lead", at, dur, freq, gain: 0.14 });
     }
   }
 
@@ -449,7 +451,7 @@ class Music {
 
     const filter = ctx.createBiquadFilter();
     filter.type = "lowpass";
-    filter.frequency.value = 900;
+    filter.frequency.value = 700; // warmer than before — softer, more felt
     filter.Q.value = 0.4;
     if (this.lfoGain) {
       // Add LFO Hz offset onto the filter cutoff for slow movement.
@@ -471,9 +473,11 @@ class Music {
     gain.gain.exponentialRampToValueAtTime(0.0001, end);
 
     const oscs: OscillatorNode[] = [];
-    for (const detune of [-6, 6]) {
+    for (const detune of [-7, 7]) {
       const osc = ctx.createOscillator();
-      osc.type = "sawtooth";
+      // Warm triangle pads (was sawtooth) — softer + rounder, to sit with the
+      // organic marimba/bell SFX rather than buzz against them.
+      osc.type = "triangle";
       osc.frequency.value = e.freq;
       osc.detune.value = detune;
       osc.connect(filter);
@@ -518,48 +522,36 @@ class Music {
     const master = this.master;
     if (!ctx || !master) return;
 
-    const gain = ctx.createGain();
-    gain.gain.value = 0.0001;
-    gain.connect(master);
-
-    const end = at + e.dur;
-    const attack = 0.25;
-    gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(e.gain, at + attack);
-    gain.gain.exponentialRampToValueAtTime(0.0001, end);
-
-    const core = ctx.createOscillator();
-    core.type = "triangle";
-    core.frequency.value = e.freq;
-    core.connect(gain);
-    core.start(at);
-    core.stop(end + 0.05);
-
-    // A quiet octave-up sine shimmer, mixed low.
-    const shimmerGain = ctx.createGain();
-    shimmerGain.gain.value = 0.0001;
-    shimmerGain.connect(master);
-    shimmerGain.gain.setValueAtTime(0.0001, at + 0.04);
-    shimmerGain.gain.exponentialRampToValueAtTime(e.gain * 0.28, at + attack + 0.1);
-    shimmerGain.gain.exponentialRampToValueAtTime(0.0001, end);
-
-    const shimmer = ctx.createOscillator();
-    shimmer.type = "sine";
-    shimmer.frequency.value = e.freq * 2;
-    shimmer.connect(shimmerGain);
-    shimmer.start(at + 0.04);
-    shimmer.stop(end + 0.05);
-
-    const cleanup = () => {
-      for (const n of [core, shimmer, gain, shimmerGain]) {
+    // A soft KALIMBA/MARIMBA pluck (the same voice family as sound.ts `found`):
+    // a fundamental + a bright 4th harmonic (marimba's signature, decays fast) +
+    // a quiet body octave. Soft mallet attack, exponential ring-out.
+    const voice = (freq: number, gain: number, wave: OscillatorType, dur: number, attack: number) => {
+      const g = ctx.createGain();
+      g.gain.value = 0.0001;
+      g.connect(master);
+      const end = at + dur;
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(gain, at + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, end);
+      const osc = ctx.createOscillator();
+      osc.type = wave;
+      osc.frequency.value = freq;
+      osc.connect(g);
+      osc.start(at);
+      osc.stop(end + 0.05);
+      osc.onended = () => {
         try {
-          n.disconnect();
+          osc.disconnect();
+          g.disconnect();
         } catch {
           /* ignore */
         }
-      }
+      };
     };
-    core.onended = cleanup;
+
+    voice(e.freq, e.gain, "sine", e.dur, 0.008);
+    voice(e.freq * 4, e.gain * 0.3, "sine", e.dur * 0.4, 0.004);
+    voice(e.freq * 2, e.gain * 0.16, "triangle", e.dur * 0.7, 0.008);
   }
 
   /** A low, slow sub-bass swell under the chord — felt more than heard. */
