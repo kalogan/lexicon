@@ -12,6 +12,7 @@ import type { MenuOption } from "game-kit/title";
 import { PlayScreen, type RoundResult } from "./PlayScreen.js";
 import { ResultsScreen } from "./ResultsScreen.js";
 import { RunScreen } from "./RunScreen.js";
+import { ChallengeScreen } from "./ChallengeScreen.js";
 import { ClassicSetup } from "./ClassicSetup.js";
 import { Codex } from "./Codex.js";
 import { TitleBackdrop } from "./TitleBackdrop.js";
@@ -20,7 +21,7 @@ import { type Mode } from "./modes.js";
 import { sound } from "./sound.js";
 import * as store from "./store.js";
 
-type Phase = "ident" | "title" | "play" | "results" | "run" | "classic" | "codex";
+type Phase = "ident" | "title" | "play" | "results" | "run" | "challenge" | "classic" | "codex";
 
 const DEFAULT_MODE: Mode = { id: "classic-4-180", label: "Classic", size: 4, durationSec: 180, blurb: "" };
 
@@ -67,7 +68,8 @@ export function App() {
 
   if (phase === "title") {
     const options: MenuOption[] = [
-      { label: "Endless", primary: true, onSelect: () => setPhase("run") },
+      { label: "Challenge", primary: true, onSelect: () => setPhase("challenge") },
+      { label: "Endless", onSelect: () => setPhase("run") },
       { label: "Classic Mode", onSelect: () => setPhase("classic") },
       { label: "Codex", onSelect: () => setPhase("codex") },
     ];
@@ -86,6 +88,10 @@ export function App() {
 
   if (phase === "run") {
     return <RunScreen onExit={() => setPhase("title")} />;
+  }
+
+  if (phase === "challenge") {
+    return <ChallengeScreen onExit={() => setPhase("title")} />;
   }
 
   if (phase === "codex") {

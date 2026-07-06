@@ -60,34 +60,37 @@ function WovenwildArt() {
 export function StudioLogo({ onDone }: { onDone: () => void }) {
   const [phase, setPhase] = useState<"rest" | "react">("rest");
 
-  // Once tapped, the wink + tongue play (~0.6s), linger, then fade to the title.
+  // Auto-play: frog forms, winks + flies its tongue, then fades to the title. We
+  // attempt the chime/thwup (silent on a stone-cold first load — no gesture yet;
+  // audible on return visits once the browser trusts the site). A tap skips.
   useEffect(() => {
-    if (phase !== "react") return;
-    const id = window.setTimeout(onDone, 1500);
-    return () => window.clearTimeout(id);
-  }, [phase, onDone]);
-
-  const tap = () => {
-    if (phase !== "rest") return;
-    sound.unlock(); // the gesture that unlocks audio
-    sound.thwup(); // in sync with the tongue lash
-    setPhase("react");
-  };
+    sound.unlock();
+    const tChime = window.setTimeout(() => sound.chime(), 1300);
+    const tReact = window.setTimeout(() => {
+      setPhase("react");
+      sound.thwup();
+    }, 2100);
+    const tDone = window.setTimeout(onDone, 3600);
+    return () => {
+      window.clearTimeout(tChime);
+      window.clearTimeout(tReact);
+      window.clearTimeout(tDone);
+    };
+  }, [onDone]);
 
   return (
     <div
       className={`studio-scene studio-scene--${phase}`}
-      role="button"
-      tabIndex={0}
-      aria-label="Tap the frog to begin"
-      onPointerDown={tap}
+      onPointerDown={() => {
+        sound.unlock();
+        onDone();
+      }}
     >
       <WovenwildArt />
       <div className="studio-brand">
         <div className="studio-wordmark">WOVENWILD</div>
         <div className="studio-tag">games</div>
       </div>
-      {phase === "rest" && <div className="studio-tap-hint">tap the frog</div>}
     </div>
   );
 }

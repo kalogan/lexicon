@@ -74,6 +74,13 @@ export function removeLetterAt(deck: readonly Tile[], index: number): Tile[] {
   return deck.filter((_, i) => i !== index);
 }
 
+/** Remove ONE copy of `letter` (returns a new deck; refuses to drop below MIN_DECK). */
+export function removeOneLetter(deck: readonly Tile[], letter: Tile): Tile[] {
+  if (deck.length <= MIN_DECK) return [...deck];
+  const i = deck.indexOf(letter);
+  return i < 0 ? [...deck] : [...deck.slice(0, i), ...deck.slice(i + 1)];
+}
+
 /** Duplicate the tile at `index` (returns a new deck). */
 export function duplicateLetterAt(deck: readonly Tile[], index: number): Tile[] {
   const t = deck[index];
