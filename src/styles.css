@@ -448,6 +448,52 @@ body,
   border-radius: 999px;
   transition: width 0.3s ease;
 }
+
+/* Hands: plays-left pips (the primary limiter) + the reshuffle/discard button */
+.plays-row {
+  width: min(92vw, 420px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.plays-pips {
+  display: inline-flex;
+  gap: 5px;
+}
+.pip {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: rgba(43, 36, 64, 0.14);
+  box-shadow: inset 0 1px 1px rgba(43, 36, 64, 0.12);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.pip.on {
+  background: var(--lex-accent);
+  box-shadow: 0 1px 4px rgba(217, 138, 61, 0.5);
+}
+.plays-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lex-muted);
+  margin-right: auto;
+}
+.discard-btn {
+  appearance: none;
+  border: 1px solid rgba(43, 36, 64, 0.18);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--lex-ink);
+  border-radius: 999px;
+  padding: 6px 13px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.discard-btn:disabled { opacity: 0.4; cursor: default; }
+.discard-btn:not(:disabled):active { transform: translateY(1px); }
 .deck {
   width: min(92vw, 420px);
   display: flex;

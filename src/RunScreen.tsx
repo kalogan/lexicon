@@ -26,12 +26,17 @@ function buzz(pattern: number | number[]) {
 }
 
 const SIZE = 5;
-const TIME_BUDGET = 90;
+const TIME_BUDGET = 120; // a relaxed safety net now that PLAYS are the real limiter
 const MAX_CHARMS = 3; // consumable slots
+// Hands: PLAYS are the primary per-board limiter (each word is a decision), with
+// the clock demoted to a comfortable safety net. DISCARDS reshuffle a dead board.
+const PLAYS_PER_BOARD = 6;
+const DISCARDS_PER_BOARD = 2;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""); // Transmute letter picker
-// Target curve — eased from 1.7 to 1.45 so the mid-run wall (boards 4–6) is
-// reachable with a decent engine. board1≈100, 3≈210, 5≈442, 6(boss)≈641.
-const targetFor = (board: number) => Math.round(100 * Math.pow(1.45, board - 1));
+// Target curve — retuned for the Hands model (only ~6 word-plays per board, vs the
+// old spam-many). Fewer words → lower bar, but it still climbs so a real engine is
+// required by mid-run. board1≈80, 3≈161, 5≈325, 6(boss discounted), 8≈930.
+const targetFor = (board: number) => Math.round(80 * Math.pow(1.42, board - 1));
 
 function cellAt(x: number, y: number): number {
   const cell = document.elementFromPoint(x, y)?.closest("[data-cell]");
@@ -89,6 +94,9 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const [boardScore, setBoardScore] = useState(0);
   const [runScore, setRunScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(() => TIME_BUDGET + (boardMod?.startTimeBonus ?? 0));
+  // Hands: word-plays left this board (the primary limiter) + board reshuffles.
+  const [playsLeft, setPlaysLeft] = useState(PLAYS_PER_BOARD);
+  const [discardsLeft, setDiscardsLeft] = useState(DISCARDS_PER_BOARD);
   const [path, setPath] = useState<number[]>([]);
   const [found, setFound] = useState<Set<string>>(() => new Set());
   // A real run opens with a 3-way choice; the first-ever run skips it (tutorial deck).
@@ -144,6 +152,9 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const bestDepth = useRef(Number(localStorage.getItem("lexicon:bestDepth") ?? 0));
   const [newRecord, setNewRecord] = useState(false);
   const tracing = useRef(false);
+  // Guards a board from ending twice (e.g. plays run out and the clock hits 0 in
+  // the same window) — which would double-bank coins / double-advance.
+  const ending = useRef(false);
   // Boss boards discount the target — the constraint IS the difficulty, so the
   // score bar drops to keep them hard-but-passable (never an unwinnable wall).
   const target = Math.round(targetFor(boardIdx) * (boss?.targetMult ?? 1));
@@ -234,19 +245,34 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setFly({ id: Date.now(), total });
     buzz(goldHit ? [0, 14, 22, 14] : 12); // a little pulse on every word; a richer one on gold
     sound.found(Math.min(11, Math.round(total / 40) + 1));
-    // One-word boss: this single word decides the board.
+    // Hands: spend a play. The board ends when plays run out (or after a one-word
+    // boss's single word). Beating the target banks it; missing it ends the run.
+    const remainingPlays = playsLeft - 1;
+    setPlaysLeft(remainingPlays);
     if (boss?.oneWord) {
       const survived = boardScore + total >= target;
-      window.setTimeout(() => {
-        if (survived) clearBoard();
-        else die();
-      }, 1300);
+      window.setTimeout(() => (survived ? clearBoard() : die()), 1300);
+    } else if (remainingPlays <= 0) {
+      const survived = boardScore + total >= target;
+      window.setTimeout(() => (survived ? clearBoard() : die()), 1000);
     }
   };
 
   const openingPick = (card: Card) => {
     setDeck((d) => [...d, card]);
     setPhase("play");
+  };
+
+  // Discard: reshuffle a dead board into fresh letters WITHOUT spending a play.
+  const discard = () => {
+    if (phase !== "play" || discardsLeft <= 0 || transmute) return;
+    setDiscardsLeft((d) => d - 1);
+    setBoardSeed(Date.now());
+    setOverrides({});
+    setFound(new Set());
+    setPath([]);
+    sound.tap();
+    buzz(12);
   };
 
   // Fire a charm: apply its one-shot effect, then consume it. Play-phase only.
@@ -315,8 +341,11 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setBoardSeed(newSeed);
     setBoss(nextBoss);
     setBoardMod(nextMod);
+    ending.current = false;
     setBoardScore(0);
     setTimeLeft(TIME_BUDGET + (nextMod?.startTimeBonus ?? 0));
+    setPlaysLeft(PLAYS_PER_BOARD);
+    setDiscardsLeft(DISCARDS_PER_BOARD);
     setFound(new Set());
     setDoubleNext(false); // per-board charm effects reset
     setSealsCleared(false);
@@ -328,6 +357,8 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
 
   // Death — record how deep this run got (meta progress) before the dead screen.
   const die = () => {
+    if (ending.current) return;
+    ending.current = true;
     if (boardIdx > bestDepth.current) {
       bestDepth.current = boardIdx;
       localStorage.setItem("lexicon:bestDepth", String(boardIdx));
@@ -340,6 +371,8 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   // Beating a board: bank coins (base + interest, Balatro-style), a calm chime,
   // then the free draft.
   const clearBoard = () => {
+    if (ending.current) return;
+    ending.current = true;
     setCoins((c) => c + 5 + Math.min(5, Math.floor(c / 5)) + (boss ? 8 : 0));
     sound.levelClear();
     // Charm drop: a boss always yields one; regular boards sometimes — if a slot is free.
@@ -429,6 +462,22 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
 
       <div className="target-bar">
         <div className="target-fill" style={{ width: `${pct}%` }} />
+      </div>
+
+      <div className="plays-row">
+        <span className="plays-pips" aria-label={`${playsLeft} of ${PLAYS_PER_BOARD} plays left`}>
+          {Array.from({ length: PLAYS_PER_BOARD }, (_, i) => (
+            <span key={i} className={`pip${i < playsLeft ? " on" : ""}`} />
+          ))}
+        </span>
+        <span className="plays-label">plays</span>
+        <button
+          className="discard-btn"
+          disabled={phase !== "play" || discardsLeft <= 0 || !!transmute}
+          onClick={discard}
+        >
+          ↻ reshuffle · {discardsLeft}
+        </button>
       </div>
 
       {/* Your relics — the engine you're building. They glow when they fire. */}
