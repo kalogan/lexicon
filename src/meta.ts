@@ -28,6 +28,8 @@ export interface Stats {
   bestMult: number;
   /** Boss boards beaten. */
   bossesBeaten: number;
+  /** Total real seconds spent in a run. */
+  timePlayed: number;
 }
 
 const ZERO: Stats = {
@@ -39,6 +41,7 @@ const ZERO: Stats = {
   bestWordScore: 0,
   bestMult: 0,
   bossesBeaten: 0,
+  timePlayed: 0,
 };
 
 interface Store {
@@ -115,6 +118,14 @@ function unlock(store: Store, ids: string[]): string[] {
 export function recordRunStart(): void {
   const s = read();
   s.stats.runs += 1;
+  write(s);
+}
+
+/** Add real seconds of play (called as a run session ends). Never negative. */
+export function addTimePlayed(seconds: number): void {
+  if (!(seconds > 0)) return;
+  const s = read();
+  s.stats.timePlayed += Math.round(seconds);
   write(s);
 }
 

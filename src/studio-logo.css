@@ -3,6 +3,44 @@
    the ART lives here; the kit <StudioIdent> owns the wrap / wordmark / tagline /
    skip / timing. All CSS keyframes so it runs even in a backgrounded tab. */
 
+/* Tap-to-wake: one gesture unlocks audio so the intro can play its chime + thwup
+   (browsers block all sound until a real user interaction). */
+.studio-wake {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  cursor: pointer;
+  background: radial-gradient(circle at 50% 42%, #fbf3e2 0%, #efe0c2 58%, #e4d0a8 100%);
+}
+.studio-wake-frog {
+  font-size: 64px;
+  line-height: 1;
+  animation: studioWakeBob 1.9s ease-in-out infinite;
+}
+.studio-wake-hint {
+  font-size: 14px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: #8a6a3f;
+  animation: studioWakePulse 1.7s ease-in-out infinite;
+}
+@keyframes studioWakeBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+@keyframes studioWakePulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-wake-frog, .studio-wake-hint { animation: none; }
+}
+
 .studio-art {
   width: min(78vw, 460px);
   height: auto;
@@ -67,10 +105,11 @@
   stroke-dashoffset: 210;
   animation: studioTongue 2.9s ease forwards;
 }
-/* Flick lands near the end of the content beat — ~1s after the eyes open — then
-   holds (forwards). The extended ident duration lets it linger, locked. */
+/* Lash out (~2.0-2.4s), then hold locked. The eye blinks right after (below),
+   then the whole ident fades (durationMs is timed to follow the blink). */
 @keyframes studioTongue {
-  0%, 86% { stroke-dashoffset: 210; }
+  0%, 70% { stroke-dashoffset: 210; }
+  84% { stroke-dashoffset: 0; }
   100% { stroke-dashoffset: 0; }
 }
 .studio-tongue-tip {
@@ -81,20 +120,22 @@
   animation: studioTongueTip 2.9s ease forwards;
 }
 @keyframes studioTongueTip {
-  0%, 95% { opacity: 0; transform: scale(0.3); }
+  0%, 80% { opacity: 0; transform: scale(0.3); }
+  88% { opacity: 1; transform: scale(1.15); }
   100% { opacity: 1; transform: scale(1); }
 }
 
-/* The right eye squints just as the tongue flicks. */
+/* As the tongue lashes above it, the right eye BLINKS — closes, then reopens. */
 .studio-eye-right {
   transform-box: fill-box;
   transform-origin: center;
-  animation: studioSquint 2.9s ease forwards;
+  animation: studioBlink 2.9s ease forwards;
 }
-@keyframes studioSquint {
-  0%, 80% { transform: scaleY(1); }
-  90% { transform: scaleY(0.28); }
-  100% { transform: scaleY(0.32); }
+@keyframes studioBlink {
+  0%, 82% { transform: scaleY(1); }
+  88% { transform: scaleY(0.08); } /* closed */
+  94% { transform: scaleY(1); } /* reopened */
+  100% { transform: scaleY(1); }
 }
 
 /* Reduced motion: drop the draw-on + scale, keep gentle fades. */

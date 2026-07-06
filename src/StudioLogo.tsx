@@ -12,7 +12,7 @@
  * since LEXICON has no tap-gate), but plays on later visits once the browser lets
  * audio start — the same behaviour as CHIMERA.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { StudioIdent } from "game-kit/title/r3f";
 import { sound } from "./sound.js";
 import "./studio-logo.css";
@@ -64,13 +64,35 @@ function WovenwildArt() {
 }
 
 export function StudioLogo({ onDone }: { onDone: () => void }) {
-  // A "thwup" in sync with the tongue flick + eye squint (~2.55s into the CSS
-  // beat, matching the studioTongue/studioSquint keyframes). The kit's onCue is
-  // already spent on the eye-open chime, so we time this one ourselves.
+  // Browsers block ALL audio until a real user gesture — we can't fake one. So the
+  // intro waits for one tap (which unlocks audio) and THEN plays with the chime +
+  // thwup. Without this, a stone-cold first load is always silent.
+  const [woke, setWoke] = useState(false);
+
+  // "thwup" in sync with the tongue lash (~2.05s into the CSS beat). Only once woke.
   useEffect(() => {
-    const id = window.setTimeout(() => sound.thwup(), 2550);
+    if (!woke) return;
+    const id = window.setTimeout(() => sound.thwup(), 2050);
     return () => window.clearTimeout(id);
-  }, []);
+  }, [woke]);
+
+  if (!woke) {
+    return (
+      <div
+        className="studio-wake"
+        role="button"
+        tabIndex={0}
+        aria-label="Tap to begin"
+        onPointerDown={() => {
+          sound.unlock();
+          setWoke(true);
+        }}
+      >
+        <span className="studio-wake-frog" aria-hidden="true">🐸</span>
+        <span className="studio-wake-hint">tap to begin</span>
+      </div>
+    );
+  }
 
   return (
     <StudioIdent
@@ -78,7 +100,7 @@ export function StudioLogo({ onDone }: { onDone: () => void }) {
       tagline="games"
       onDone={onDone}
       onCue={() => sound.chime()}
-      timing={{ durationMs: 4500, cueMs: 1900 }}
+      timing={{ durationMs: 3200, cueMs: 1900 }}
     >
       <WovenwildArt />
     </StudioIdent>

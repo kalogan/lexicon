@@ -215,10 +215,20 @@ function CollectionTab({ relics, charms }: { relics: Card[]; charms: Charm[] }) 
  * A tidy two-column (label · value) list read once from the meta store. All-zero
  * is a perfectly fine "empty" state — no special-casing needed.
  */
+function formatDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s % 60}s`;
+  return `${s}s`;
+}
+
 function StatsTab() {
   const s = getStats();
   const rows: readonly [string, string][] = [
     ["Runs played", `${s.runs}`],
+    ["Time played", formatDuration(s.timePlayed)],
     ["Deepest board", `${s.bestDepth}`],
     ["Best run score", `${s.bestScore}`],
     ["Words played", `${s.totalWords}`],
