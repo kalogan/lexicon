@@ -15,6 +15,7 @@ import { canExtend, pathWord, MIN_WORD_LEN, type Board } from "./board.js";
 import { readyDictionary, loadDictionary, type Dictionary } from "./dictionary.js";
 import { scoreWord, makeRunState, type RunState, type Card, type Breakdown } from "./run/engine.js";
 import { DRAFT_POOL } from "./run/cards.js";
+import { CHALLENGE_EXCLUDED_RELICS } from "./run/challenge-pool.js";
 import {
   STARTER_LETTER_DECK,
   makeBoardFromDeck,
@@ -159,7 +160,9 @@ export function ChallengeScreen({ onExit, resume }: { onExit: () => void; resume
   // Relic pool available this run — legendaries gate in via lifetime unlocks.
   const [pool] = useState<readonly Card[]>(() => {
     const ids = unlockedRelicIds(meta.getStats());
-    return DRAFT_POOL.filter((c) => ids.has(c.id));
+    // Challenge has no clock, so TIME-only relics are dead weight — drop them from
+    // BOTH the opening 1-of-3 relic draft AND the shop (which share this `pool`).
+    return DRAFT_POOL.filter((c) => ids.has(c.id) && !CHALLENGE_EXCLUDED_RELICS.has(c.id));
   });
   // Opening draft: choose 1 of 3 relics to seed your engine.
   const [relicOffer] = useState(() => pickRelics(pool, 3).map((r) => r.card));
