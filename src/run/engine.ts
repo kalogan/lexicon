@@ -71,10 +71,19 @@ export interface Card {
    *  mult or counter this relic has built up. Return null if nothing has accrued
    *  (or omit for cards whose effect never accumulates). */
   accrued?: (run: RunState) => string | null;
+  /** Optional: called once when a word is COMMITTED (not on preview), so a
+   *  SCALING relic can permanently GROW its own value in `run.counters`
+   *  (keyed by the card's id) based on the word just played. `apply` then reads
+   *  that counter to scale future words — the Balatro "watering" archetype.
+   *  `run` here is the pre-update state (so `lastFirst` is the PREVIOUS word),
+   *  and mutating `run.counters` is expected. */
+  grow?(run: RunState, b: Breakdown): void;
 }
 
 export interface Breakdown {
   word: string;
+  /** The structural facts of the scored word (so `grow`/UI needn't recompute). */
+  props: WordProps;
   base: number;
   chips: number;
   mult: number;
@@ -108,6 +117,7 @@ export function scoreWord(word: string, deck: readonly Card[], run: RunState): B
   const total = Math.max(0, Math.round(ctx.chips * ctx.mult));
   return {
     word: props.word,
+    props,
     base,
     chips: ctx.chips,
     mult: ctx.mult,

@@ -45,7 +45,9 @@
   100% { opacity: 1; transform: scale(1); }
 }
 .studio-body { fill: #6fb98f; stroke: #4e9a70; stroke-width: 2; }
-.studio-eye { fill: #1a1420; opacity: 0; animation: studioEye 2.9s ease forwards; }
+/* Frog eyes: pale eyeball + dark pupil + bright glint, all opening together. */
+.studio-eyeball { fill: #fbf7ee; stroke: #4e9a70; stroke-width: 1.5; opacity: 0; animation: studioEye 2.9s ease forwards; }
+.studio-pupil { fill: #1a1420; opacity: 0; animation: studioEye 2.9s ease forwards; }
 .studio-glint { fill: #fff; opacity: 0; animation: studioEye 2.9s ease forwards; }
 @keyframes studioEye {
   0% { opacity: 0; }

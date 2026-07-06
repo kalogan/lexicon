@@ -41,10 +41,14 @@ function WovenwildArt() {
         <ellipse cx={200} cy={168} rx={62} ry={54} className="studio-body" />
         <circle cx={170} cy={132} r={30} className="studio-body" />
         <circle cx={232} cy={138} r={26} className="studio-body" />
-        <circle cx={184} cy={158} r={9} className="studio-eye" />
-        <circle cx={218} cy={158} r={9} className="studio-eye" />
-        <circle cx={187} cy={155} r={3} className="studio-glint" />
-        <circle cx={221} cy={155} r={3} className="studio-glint" />
+        {/* Frog eyes: pale eyeballs sitting on the bulges, with dark pupils that
+            open (fade in) on the beat the chime plays. */}
+        <circle cx={173} cy={131} r={15} className="studio-eyeball" />
+        <circle cx={229} cy={136} r={13} className="studio-eyeball" />
+        <circle cx={177} cy={133} r={6.5} className="studio-pupil" />
+        <circle cx={226} cy={138} r={6} className="studio-pupil" />
+        <circle cx={179.5} cy={130.5} r={2.4} className="studio-glint" />
+        <circle cx={228.5} cy={135.5} r={2} className="studio-glint" />
       </g>
     </svg>
   );

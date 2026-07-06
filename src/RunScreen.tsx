@@ -44,7 +44,12 @@ function cellAt(x: number, y: number): number {
 }
 
 /** Advance run state immutably when a word is played (keeps React re-rendering). */
-function commit(run: RunState, b: Breakdown): RunState {
+function commit(run: RunState, b: Breakdown, deck: readonly Card[]): RunState {
+  // Let SCALING relics grow their counters first, reading the PRE-update run
+  // (so streak/prev comparisons see the previous word) with a fresh counters copy.
+  const counters = { ...run.counters };
+  const growCtx: RunState = { ...run, counters };
+  for (const c of deck) c.grow?.(growCtx, b);
   const seenFirst = new Set(run.seenFirst);
   seenFirst.add(b.word[0] ?? "");
   return {
@@ -54,6 +59,7 @@ function commit(run: RunState, b: Breakdown): RunState {
     lastFirst: b.word[0] ?? null,
     permaMult: run.permaMult + b.permaMultAdd,
     seenFirst,
+    counters,
   };
 }
 
@@ -236,7 +242,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setBoardScore((s) => s + total);
     setRunScore((s) => s + total);
     setTimeLeft((t) => t + b.timeGain);
-    setRun((r) => commit(r, b));
+    setRun((r) => commit(r, b, effectiveDeck));
     setToast(b);
     window.setTimeout(() => setToast((t) => (t === b ? null : t)), 1400);
     // Juice: glow the relics that fired + fly the score up.
@@ -431,36 +437,38 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
 
   return (
     <div className="run">
-      {/* Compact top bar: exit · board · coins */}
+      {/* Top bar: exit · score+mult (center) · coins */}
       <header className="hud-top">
         <button className="icon-btn" aria-label="Exit" onClick={onExit}>
           ✕
         </button>
-        <span className="hud-board">
-          Board {boardIdx}
-          {boss ? " · boss" : ""}
-        </span>
+        <div className="hud-score">
+          <div className="hud-score-line">
+            <span className="hud-score-num" key={boardScore}>{boardScore}</span>
+            <span className="hud-score-target">/ {target}</span>
+          </div>
+          {run.permaMult > 0 && <span className="hud-mult">×{(1 + run.permaMult).toFixed(1)} mult</span>}
+          {fly && (
+            <span key={fly.id} className="score-fly">
+              +{fly.total}
+            </span>
+          )}
+        </div>
         <div className="coins" key={coins}>
           🪙 {coins}
         </div>
       </header>
 
-      {/* Score hero — the number you grow, with the target folded into the bar */}
-      <div className="score-hero">
-        <span className="score-big" key={boardScore}>{boardScore}</span>
-        <span className="score-target">/ {target}</span>
-        {fly && (
-          <span key={fly.id} className="score-fly">
-            +{fly.total}
-          </span>
-        )}
-      </div>
       <div className="target-bar">
         <div className="target-fill" style={{ width: `${pct}%` }} />
       </div>
 
-      {/* Resources: plays (primary) · time (safety net) · reshuffle */}
+      {/* Resources: board · plays (primary) · time (safety net) · reshuffle */}
       <div className="resource-row">
+        <span className="hud-board">
+          Board {boardIdx}
+          {boss ? " · boss" : ""}
+        </span>
         <span className="plays-pips" aria-label={`${playsLeft} of ${PLAYS_PER_BOARD} plays left`}>
           {Array.from({ length: PLAYS_PER_BOARD }, (_, i) => (
             <span key={i} className={`pip${i < playsLeft ? " on" : ""}`} />
