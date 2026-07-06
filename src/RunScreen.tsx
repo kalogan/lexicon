@@ -12,6 +12,7 @@ import { scoreWord, makeRunState, type RunState, type Card, type Breakdown } fro
 import { STARTER_DECK, TUTORIAL_DECK, DRAFT_POOL } from "./run/cards.js";
 import { randomBoss, type Boss } from "./run/bosses.js";
 import { randomModifier, goldCell, type BoardMod } from "./run/modifiers.js";
+import { STARTER_CHARM, randomCharm, type Charm } from "./run/charms.js";
 import { RelicCard } from "./RelicCard.js";
 import { sound } from "./sound.js";
 import { music } from "./music.js";
@@ -26,6 +27,7 @@ function buzz(pattern: number | number[]) {
 
 const SIZE = 5;
 const TIME_BUDGET = 90;
+const MAX_CHARMS = 3; // consumable slots
 // Target curve — eased from 1.7 to 1.45 so the mid-run wall (boards 4–6) is
 // reachable with a decent engine. board1≈100, 3≈210, 5≈442, 6(boss)≈641.
 const targetFor = (board: number) => Math.round(100 * Math.pow(1.45, board - 1));
@@ -100,7 +102,15 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const [flash, setFlash] = useState<Set<string>>(() => new Set());
   const [fly, setFly] = useState<{ id: number; total: number } | null>(null);
   const [boss, setBoss] = useState<Boss | null>(null);
-  const blocked = useMemo(() => new Set(boss?.blocked?.(SIZE, boardSeed) ?? []), [boss, boardSeed]);
+  // Consumable charms: held in a few slots, tapped to fire, then used up.
+  const [charms, setCharms] = useState<Charm[]>(() => [STARTER_CHARM]);
+  const [doubleNext, setDoubleNext] = useState(false); // Spotlight charm: next word ×2
+  const [sealsCleared, setSealsCleared] = useState(false); // Locksmith charm: unseal this board
+  const [charmToast, setCharmToast] = useState<string | null>(null);
+  const blocked = useMemo(
+    () => new Set(sealsCleared ? [] : boss?.blocked?.(SIZE, boardSeed) ?? []),
+    [boss, boardSeed, sealsCleared],
+  );
   // Gold tile — a modifier can light one cell; a word tracing through it scores ×goldMult.
   const goldTile = useMemo(
     () => (boardMod?.goldTile && !boss ? goldCell(SIZE, boardSeed, blocked) : -1),
@@ -178,12 +188,21 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
       return;
     }
     const raw = scoreWord(word, effectiveDeck, run);
+    const triggers = [...raw.triggers];
     // Gold tile: a word tracing through the lit cell scores ×goldMult this board.
     const goldHit = goldTile >= 0 && cur.includes(goldTile);
-    const total = goldHit ? Math.round(raw.total * goldMult) : raw.total;
-    const b: Breakdown = goldHit
-      ? { ...raw, total, triggers: [...raw.triggers, { card: "Golden Tile", detail: `×${goldMult}` }] }
-      : raw;
+    let total = raw.total;
+    if (goldHit) {
+      total = Math.round(total * goldMult);
+      triggers.push({ card: "Golden Tile", detail: `×${goldMult}` });
+    }
+    // Spotlight charm: this word (only) scores ×2, then the charm is spent.
+    if (doubleNext) {
+      total = total * 2;
+      triggers.push({ card: "Spotlight", detail: "×2" });
+      setDoubleNext(false);
+    }
+    const b: Breakdown = { ...raw, total, triggers };
     setFound((f) => new Set(f).add(word));
     setBoardScore((s) => s + total);
     setRunScore((s) => s + total);
@@ -212,6 +231,37 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setPhase("play");
   };
 
+  // Fire a charm: apply its one-shot effect, then consume it. Play-phase only.
+  const useCharm = (charm: Charm, idx: number) => {
+    if (phase !== "play") return;
+    const e = charm.effect;
+    switch (e.kind) {
+      case "time":
+        setTimeLeft((t) => t + e.seconds);
+        break;
+      case "reroll":
+        setBoardSeed(Date.now()); // new letters (target/time/score carry over)
+        setFound(new Set());
+        setPath([]);
+        break;
+      case "doubleNext":
+        setDoubleNext(true);
+        break;
+      case "clearSeals":
+        setSealsCleared(true);
+        break;
+      case "permaMult":
+        setRun((r) => ({ ...r, permaMult: r.permaMult + e.amount }));
+        break;
+    }
+    setCharms((cs) => cs.filter((_, i) => i !== idx));
+    const msg = `✦ ${charm.name}`;
+    setCharmToast(msg);
+    window.setTimeout(() => setCharmToast((m) => (m === msg ? null : m)), 1400);
+    sound.found(4);
+    buzz(20);
+  };
+
   const advanceBoard = () => {
     const nb = boardIdx + 1;
     const newSeed = Date.now();
@@ -225,6 +275,8 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setBoardScore(0);
     setTimeLeft(TIME_BUDGET + (nextMod?.startTimeBonus ?? 0));
     setFound(new Set());
+    setDoubleNext(false); // per-board charm effects reset
+    setSealsCleared(false);
     setRun((r) => ({ ...r, board: r.board + 1, boardWords: 0, lastFirst: null }));
     setPhase("play");
   };
@@ -245,6 +297,14 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const clearBoard = () => {
     setCoins((c) => c + 5 + Math.min(5, Math.floor(c / 5)) + (boss ? 8 : 0));
     sound.levelClear();
+    // Charm drop: a boss always yields one; regular boards sometimes — if a slot is free.
+    if ((boss || Math.random() < 0.35) && charms.length < MAX_CHARMS) {
+      const got = randomCharm(Date.now());
+      setCharms((cs) => (cs.length < MAX_CHARMS ? [...cs, got] : cs));
+      const msg = `✦ found ${got.name}`;
+      setCharmToast(msg);
+      window.setTimeout(() => setCharmToast((m) => (m === msg ? null : m)), 1800);
+    }
     setBoss(null);
     setDraft(pickN(deck));
     setPhase("draft");
@@ -335,6 +395,29 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
           ))}
         </div>
       </div>
+
+      {/* Charms — one-shot consumables. Tap to fire (spends it). */}
+      {charms.length > 0 && (
+        <div className="charm-tray">
+          <span className="charm-label">✦ charms · tap to use</span>
+          <div className="charm-row">
+            {charms.map((ch, i) => (
+              <button
+                key={ch.id + i}
+                className={`charm charm--${ch.rarity}`}
+                disabled={phase !== "play"}
+                onClick={() => useCharm(ch, i)}
+                title={`${ch.name} — ${ch.blurb}`}
+              >
+                <span className="charm-name">{ch.name}</span>
+                <span className="charm-blurb">{ch.blurb}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {charmToast && <div className="charm-toast" key={charmToast}>{charmToast}</div>}
 
       {boss && phase === "play" && (
         <div className="boss-banner">

@@ -12,6 +12,7 @@ import { ResultsScreen } from "./ResultsScreen.js";
 import { RunScreen } from "./RunScreen.js";
 import { ClassicSetup } from "./ClassicSetup.js";
 import { Codex } from "./Codex.js";
+import { TitleBackdrop } from "./TitleBackdrop.js";
 import { loadDictionary } from "./dictionary.js";
 import { type Mode } from "./modes.js";
 import { sound } from "./sound.js";
@@ -82,6 +83,7 @@ export function App() {
         title="LEXICON"
         subtitle="Build impossible vocabulary engines."
         titleColor="#2b2440"
+        backdrop={<TitleBackdrop />}
         options={options}
       />
     );

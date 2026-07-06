@@ -765,6 +765,60 @@ body,
   .tile.gold { animation: none; }
 }
 
+/* Charms — one-shot consumable tray (distinct from the persistent relic deck) */
+.charm-tray {
+  width: min(92vw, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.charm-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lex-muted);
+}
+.charm-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.charm {
+  appearance: none;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--r-common);
+  background: radial-gradient(120% 120% at 20% 10%, rgba(255, 255, 255, 0.85), var(--lex-tile));
+  color: var(--lex-ink);
+  box-shadow: 0 2px 6px rgba(43, 36, 64, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.charm--uncommon { border-color: var(--r-uncommon); }
+.charm--rare { border-color: var(--r-rare); }
+.charm--legendary { border-color: var(--r-legendary); }
+.charm:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(43, 36, 64, 0.22); }
+.charm:not(:disabled):active { transform: translateY(0); }
+.charm:disabled { opacity: 0.5; cursor: default; }
+.charm-name { font-weight: 800; font-size: 12px; letter-spacing: 0.01em; }
+.charm-blurb { font-size: 10px; color: var(--lex-muted); }
+.charm-toast {
+  width: min(92vw, 420px);
+  text-align: center;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--lex-accent-deep);
+  background: rgba(217, 138, 61, 0.14);
+  border-radius: 12px;
+  padding: 7px 12px;
+  animation: pop-in 0.3s ease;
+}
+
 /* The shop — a distinct "vault" panel so it doesn't read like the draft */
 .shop-card {
   width: min(94vw, 560px);
