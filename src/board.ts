@@ -42,10 +42,28 @@ export interface Board {
   cells: Cell[];
 }
 
+const VOWELS = "aeiou";
+/** Does this cell contribute a vowel? (Qu's "qu" counts — it carries a `u`.) */
+function isVowelCell(cell: Cell): boolean {
+  return [...cell.value].some((ch) => VOWELS.includes(ch));
+}
+/** Vowel bag weighted toward English frequency, for topping up starved boards. */
+const VOWEL_BAG = "eeeeaaaooiiu";
+
+/** Fewest vowels a board must have to be reliably spellable (~a third of cells). */
+export function vowelFloor(count: number): number {
+  return Math.max(2, Math.round(count * 0.32));
+}
+
 /**
  * Roll a `size`×`size` board from a seed: shuffle the dice into grid positions,
  * then roll each die to a random face. (Only 4×4 has authored dice; larger
  * sizes reuse the 4×4 dice cyclically — fine for a seeded letter mix.)
+ *
+ * A raw roll can land vowel-starved and literally unspellable (especially on
+ * 5×5/6×6, where 16 dice are reused for 25/36 cells). So we guarantee a vowel
+ * FLOOR: if too few, convert the fewest random consonant cells into vowels. This
+ * trades a little Boggle-die purity for boards that are always playable.
  */
 export function makeBoard(seed: number, size = 4): Board {
   const rng = createRng(seed);
@@ -57,6 +75,24 @@ export function makeBoard(seed: number, size = 4): Board {
     const face = die[Math.floor(rng.next() * die.length)]!;
     cells.push(faceToCell(face));
   }
+
+  // Enforce the vowel floor — convert consonant cells (in a seeded random order)
+  // into weighted-random vowels until the board is comfortably spellable.
+  const floor = vowelFloor(count);
+  let vowels = cells.filter(isVowelCell).length;
+  if (vowels < floor) {
+    const consonants = shuffle(
+      cells.map((c, i) => (isVowelCell(c) ? -1 : i)).filter((i) => i >= 0),
+      rng,
+    );
+    for (const idx of consonants) {
+      if (vowels >= floor) break;
+      const v = VOWEL_BAG[Math.floor(rng.next() * VOWEL_BAG.length)]!;
+      cells[idx] = { label: v.toUpperCase(), value: v };
+      vowels++;
+    }
+  }
+
   return { size, cells };
 }
 

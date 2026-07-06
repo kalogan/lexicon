@@ -11,12 +11,13 @@ import { PlayScreen, type RoundResult } from "./PlayScreen.js";
 import { ResultsScreen } from "./ResultsScreen.js";
 import { RunScreen } from "./RunScreen.js";
 import { ClassicSetup } from "./ClassicSetup.js";
+import { Codex } from "./Codex.js";
 import { loadDictionary } from "./dictionary.js";
 import { type Mode } from "./modes.js";
 import { sound } from "./sound.js";
 import * as store from "./store.js";
 
-type Phase = "gate" | "ident" | "title" | "play" | "results" | "run" | "classic";
+type Phase = "gate" | "ident" | "title" | "play" | "results" | "run" | "classic" | "codex";
 
 const DEFAULT_MODE: Mode = { id: "classic-4-180", label: "Classic", size: 4, durationSec: 180, blurb: "" };
 
@@ -74,6 +75,7 @@ export function App() {
     const options: MenuOption[] = [
       { label: "Roguelike", primary: true, onSelect: () => setPhase("run") },
       { label: "Classic", onSelect: () => setPhase("classic") },
+      { label: "Codex", onSelect: () => setPhase("codex") },
     ];
     return (
       <TitleScreen
@@ -87,6 +89,10 @@ export function App() {
 
   if (phase === "run") {
     return <RunScreen onExit={() => setPhase("title")} />;
+  }
+
+  if (phase === "codex") {
+    return <Codex onExit={() => setPhase("title")} />;
   }
 
   if (phase === "classic") {

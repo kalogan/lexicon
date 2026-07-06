@@ -152,6 +152,19 @@ export const ALL_CARDS: readonly Card[] = [
   TINY, SCHOLAR, RARE_LETTER, PREFIX, SUFFIX, ALPHABET, TIME_DICT, TIME_BROKER, CHRONOLOGIST,
 ];
 
+/**
+ * The FULL relic collection — every draftable/ownable card across all packs, for
+ * the Codex (design-wiki). ALL_CARDS holds the starters + core; the extra packs
+ * hold the rest. Ids are unique across packs, so no dedupe is needed.
+ */
+export const CATALOG: readonly Card[] = [
+  ...ALL_CARDS,
+  ...EXTRA_CARDS,
+  ...EXTRA_CARDS2,
+  ...EXTRA_CARDS3,
+  ...EXTRA_CARDS4,
+];
+
 /** A gentle starting deck for REAL runs; everything else is drafted 1-of-3. */
 export const STARTER_DECK: readonly Card[] = [ALPHABET, TINY];
 

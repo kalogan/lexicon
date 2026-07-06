@@ -6,7 +6,11 @@ import {
   isValidPath,
   pathWord,
   wordScore,
+  vowelFloor,
 } from "./board.js";
+
+const countVowels = (bd: { cells: { value: string }[] }) =>
+  bd.cells.filter((c) => [...c.value].some((ch) => "aeiou".includes(ch))).length;
 
 describe("makeBoard", () => {
   it("is deterministic per seed", () => {
@@ -26,6 +30,21 @@ describe("makeBoard", () => {
       expect(c.label.length).toBeGreaterThan(0);
       expect(c.value).toBe(c.label.toLowerCase());
     }
+  });
+  it("guarantees the vowel floor for every board (no unspellable rolls)", () => {
+    for (const size of [4, 5, 6]) {
+      const floor = vowelFloor(size * size);
+      for (let seed = 1; seed <= 400; seed++) {
+        const bd = makeBoard(seed, size);
+        expect(countVowels(bd)).toBeGreaterThanOrEqual(floor);
+      }
+    }
+  });
+  it("stays deterministic after a vowel top-up", () => {
+    // seed 3 on 5×5 exercises the top-up path; must reproduce exactly.
+    const a = makeBoard(3, 5).cells.map((c) => c.value);
+    const b = makeBoard(3, 5).cells.map((c) => c.value);
+    expect(a).toEqual(b);
   });
 });
 

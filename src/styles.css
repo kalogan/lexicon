@@ -849,3 +849,195 @@ body,
   transform: none;
   box-shadow: 0 2px 6px rgba(43, 36, 64, 0.12);
 }
+
+/* ── Codex (design-wiki / almanac) ───────────────────────────────────────────
+   A scrollable reference of every relic, modifier, and boss. Full-height shell
+   with a pinned header and one scroll region so the long relic grid scrolls on
+   mobile without the page body getting stuck. Warm-paper aesthetic, no new
+   colors — everything routes through the --lex-* / --r-* vars. */
+.codex {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.codex-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 12px;
+  border-bottom: 1px solid rgba(43, 36, 64, 0.1);
+  background: rgba(251, 247, 238, 0.7);
+  backdrop-filter: blur(6px);
+}
+.codex-heading {
+  min-width: 0;
+}
+.codex-title {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--lex-ink);
+}
+.codex-subtitle {
+  margin: 3px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--lex-muted);
+  font-variant-numeric: tabular-nums;
+}
+.codex-close {
+  flex: 0 0 auto;
+  appearance: none;
+  border: 1px solid rgba(43, 36, 64, 0.16);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--lex-ink);
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(43, 36, 64, 0.12);
+}
+.codex-close:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.codex-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 16px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.codex-section {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.codex-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lex-muted);
+}
+.codex-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--lex-accent-deep);
+  background: rgba(217, 138, 61, 0.12);
+  border-radius: 999px;
+  padding: 2px 9px;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.codex-relic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+/* Modifiers — light cards echoing the in-run mod banners. */
+.codex-mod-grid,
+.codex-boss-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.codex-mod {
+  border-radius: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(43, 36, 64, 0.1);
+}
+.codex-mod--boon {
+  background: linear-gradient(90deg, rgba(78, 154, 112, 0.16), rgba(78, 154, 112, 0.04));
+  border-color: rgba(78, 154, 112, 0.4);
+}
+.codex-mod--twist {
+  background: linear-gradient(90deg, rgba(217, 138, 61, 0.16), rgba(217, 138, 61, 0.04));
+  border-color: rgba(217, 138, 61, 0.4);
+}
+.codex-mod-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.codex-mod-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+.codex-mod-name {
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  color: var(--lex-ink);
+}
+.codex-tone {
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  padding: 3px 7px;
+  border-radius: 999px;
+}
+.codex-tone--boon {
+  color: var(--lex-ok);
+  background: rgba(78, 154, 112, 0.16);
+}
+.codex-tone--twist {
+  color: var(--lex-accent-deep);
+  background: rgba(217, 138, 61, 0.16);
+}
+.codex-mod-blurb {
+  margin: 7px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--lex-ink);
+}
+
+/* Bosses — a darker, danger treatment so they read as threats. */
+.codex-boss {
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: #f4efe4;
+  background: linear-gradient(160deg, #2b2440 0%, #241d38 100%);
+  border: 1px solid rgba(208, 86, 63, 0.5);
+  box-shadow: 0 2px 8px rgba(20, 14, 30, 0.28);
+}
+.codex-boss-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.codex-boss-mark {
+  font-size: 16px;
+  line-height: 1;
+  color: var(--lex-bad);
+}
+.codex-boss-name {
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.03em;
+}
+.codex-boss-blurb {
+  margin: 7px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(244, 239, 228, 0.82);
+}
