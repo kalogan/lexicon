@@ -20,6 +20,7 @@ import { CATALOG } from "./run/cards.js";
 import { MODIFIERS, type BoardMod } from "./run/modifiers.js";
 import { BOSSES } from "./run/bosses.js";
 import { CHARMS, type Charm } from "./run/charms.js";
+import { stakeAt } from "./run/stakes.js";
 import type { Card, Rarity } from "./run/engine.js";
 import { getStats, getUnlocked, getSeen, ACHIEVEMENTS } from "./meta.js";
 
@@ -281,6 +282,7 @@ function StatsTab() {
     ["Best mult", `×${(1 + s.bestMult).toFixed(1)}`],
     ["Bosses beaten", `${s.bossesBeaten}`],
     ["Challenge wins", `${s.challengeWins}`],
+    ["Top stake cleared", s.topStakeWon > 0 ? `${stakeAt(s.topStakeWon).name} (${s.topStakeWon})` : "—"],
   ];
 
   return (

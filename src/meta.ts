@@ -9,6 +9,8 @@
  * Achievements tabs. All storage access is try/caught (private-mode / SSR safe).
  */
 
+import { STAKE_COUNT } from "./run/stakes.js";
+
 const KEY = "lexicon:stats";
 
 export interface Stats {
@@ -32,6 +34,10 @@ export interface Stats {
   timePlayed: number;
   /** Challenge runs won (cleared the final boss). */
   challengeWins: number;
+  /** Highest Challenge stake UNLOCKED (playable). Starts at 1. */
+  topStakeUnlocked: number;
+  /** Highest Challenge stake ever CLEARED (0 = none yet). */
+  topStakeWon: number;
 }
 
 const ZERO: Stats = {
@@ -45,6 +51,8 @@ const ZERO: Stats = {
   bossesBeaten: 0,
   timePlayed: 0,
   challengeWins: 0,
+  topStakeUnlocked: 1,
+  topStakeWon: 0,
 };
 
 interface Store {
@@ -189,10 +197,12 @@ export function addTimePlayed(seconds: number): string[] {
   return fresh;
 }
 
-/** A Challenge run was WON (cleared the final boss). */
-export function recordChallengeWin(): string[] {
+/** A Challenge run was WON at `stake` — bank the win and unlock the next stake. */
+export function recordChallengeWin(stake: number): string[] {
   const s = read();
   s.stats.challengeWins += 1;
+  s.stats.topStakeWon = Math.max(s.stats.topStakeWon, stake);
+  s.stats.topStakeUnlocked = Math.max(s.stats.topStakeUnlocked, Math.min(stake + 1, STAKE_COUNT));
   const fresh = unlock(s, ["challenger"]);
   write(s);
   return fresh;

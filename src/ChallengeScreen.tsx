@@ -34,6 +34,7 @@ import {
 } from "./run/challenge.js";
 import { challengeBoss, type Boss } from "./run/bosses.js";
 import { challengeModifier, goldCell, type BoardMod } from "./run/modifiers.js";
+import { STAKES, stakeRules, stakeAt, clampStake } from "./run/stakes.js";
 import { STARTER_CHARM, randomCharm, type Charm } from "./run/charms.js";
 import { RelicCard } from "./RelicCard.js";
 import * as meta from "./meta.js";
@@ -125,7 +126,12 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   const [letters, setLetters] = useState<Tile[]>(() => [...STARTER_LETTER_DECK]);
   const [coins, setCoins] = useState(0);
   const [step, setStep] = useState(0); // which blind (0..TOTAL_BLINDS-1)
-  const [phase, setPhase] = useState<"draft" | "draftRelic" | "intro" | "play" | "shop" | "won" | "lost">("draft");
+  // Difficulty stake for this run. Players who've won pick their stake up front;
+  // first-timers skip straight to the draft at Stake I.
+  const [stake, setStake] = useState(() => clampStake(meta.getStats().topStakeUnlocked));
+  const [phase, setPhase] = useState<
+    "stake" | "draft" | "draftRelic" | "intro" | "play" | "shop" | "won" | "lost"
+  >(() => (meta.getStats().topStakeUnlocked > 1 ? "stake" : "draft"));
   // Opening draft: choose 5 of 10 offered letters to add to the base deck.
   const [offer] = useState(() => letterOffer(10));
   const [picked, setPicked] = useState<Set<number>>(() => new Set());
@@ -161,19 +167,26 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   const ending = useRef(false);
 
   const blind: Blind = blindAtStep(step) ?? blindAtStep(TOTAL_BLINDS - 1)!;
-  // Boss blinds carry a boss (a "debuff": word rule and/or sealed tiles). Stable
-  // per step within a run; varies across runs via runSalt.
+  // Stake difficulty rules (cumulative). Read throughout the run.
+  const rules = useMemo(() => stakeRules(stake), [stake]);
+  const playsPerBlind = PLAYS_PER_BLIND + rules.playsDelta;
+  // A blind carries a boss on its Boss blind — and, at Black stake+, its Big blind.
+  const hasBoss = blind.isBoss || (rules.bossOnBig && blind.indexInAnte === 1);
+  // Boss "debuff": word rule and/or sealed tiles. Stable per step within a run;
+  // varies across runs via runSalt.
   const boss: Boss | null = useMemo(
-    () => (blind.isBoss ? challengeBoss(blind.step ^ runSalt) : null),
-    [blind.isBoss, blind.step, runSalt],
+    () => (hasBoss ? challengeBoss(blind.step ^ runSalt) : null),
+    [hasBoss, blind.step, runSalt],
   );
-  // The boss's target discount, blended so a boss blind still out-targets its Big
-  // blind (the constraint supplies the rest of the difficulty).
+  // Target = stake-scaled blind target, then softened for a boss (blended so it
+  // still out-targets the previous blind in the ante — the constraint is the rest).
   const target = useMemo(() => {
-    if (!boss) return blind.target;
-    const softened = Math.round(blind.target * (BOSS_SOFTEN + (1 - BOSS_SOFTEN) * boss.targetMult));
-    return Math.max(blindTarget(blind.ante, 1) + 1, softened);
-  }, [boss, blind.target, blind.ante]);
+    const base = Math.round(blind.target * rules.targetMult);
+    if (!boss) return base;
+    const softened = Math.round(base * (BOSS_SOFTEN + (1 - BOSS_SOFTEN) * boss.targetMult));
+    const prev = Math.round(blindTarget(blind.ante, Math.max(0, blind.indexInAnte - 1)) * rules.targetMult);
+    return Math.max(prev + 1, softened);
+  }, [boss, blind.target, blind.ante, blind.indexInAnte, rules.targetMult]);
   // Sealed cells for a boss board (unless a charm shattered them this blind).
   const blocked = useMemo(
     () => new Set(sealsCleared ? [] : boss?.blocked?.(SIZE, boardSeed) ?? []),
@@ -291,7 +304,7 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     ending.current = false;
     setBoardSeed(Date.now());
     setBoardScore(0);
-    setPlaysLeft(PLAYS_PER_BLIND);
+    setPlaysLeft(playsPerBlind);
     setDiscardsLeft(DISCARDS_PER_BLIND);
     setFound(new Set());
     setPath([]);
@@ -306,11 +319,13 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   const clearBlind = () => {
     if (ending.current) return;
     ending.current = true;
-    const interest = Math.min(5, Math.floor(coins / 5));
-    setCoins((c) => c + blind.reward + interest);
+    // Stake economy: interest can be switched off; rewards can be scaled down.
+    const interest = rules.interest ? Math.min(5, Math.floor(coins / 5)) : 0;
+    const reward = Math.round(blind.reward * rules.rewardMult);
+    setCoins((c) => c + reward + interest);
     sound.levelClear();
     if (isWin(step + 1)) {
-      meta.recordChallengeWin(); // 🏅 Challenger (the win screen is the celebration)
+      meta.recordChallengeWin(stake); // 🏅 Challenger + unlocks the next stake
       setPhase("won"); // cleared the final boss
       return;
     }
@@ -530,6 +545,45 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   const inspectAccrued = inspect?.accrued?.(run) ?? null;
 
   // ── Overlays ─────────────────────────────────────────────────────────────────
+  if (phase === "stake") {
+    const unlocked = meta.getStats().topStakeUnlocked;
+    const sel = stakeAt(stake);
+    return (
+      <div className="menu-veil">
+        <div className="ldraft-card">
+          <div className="menu-title">Choose your stake</div>
+          <div className="confirm-sub">Each stake stacks a harder rule on the last. Win a run to unlock the next.</div>
+          <div className="stake-row">
+            {STAKES.map((st) => {
+              const locked = st.id > unlocked;
+              return (
+                <button
+                  key={st.id}
+                  type="button"
+                  className={`stake-chip${st.id === stake ? " sel" : ""}${locked ? " locked" : ""}`}
+                  style={{ ["--stake" as string]: st.color }}
+                  disabled={locked}
+                  onClick={() => setStake(st.id)}
+                  aria-pressed={st.id === stake}
+                  title={locked ? "Locked — win at the previous stake" : `${st.name} — ${st.blurb}`}
+                >
+                  <span className="stake-dot" aria-hidden="true" />
+                  <span className="stake-chip-name">{locked ? "🔒" : st.name}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="stake-detail">
+            <b>{sel.name} Stake</b>
+            <span>{sel.blurb}</span>
+          </div>
+          <button className="btn primary" onClick={() => setPhase("draft")}>
+            Begin at {sel.name} →
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (phase === "draft") {
     const comp = deckComposition(letters);
     return (
@@ -599,7 +653,14 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     );
   }
   if (phase === "won") {
-    return <ChallengeWin coins={coins} onExit={onExit} />;
+    return (
+      <ChallengeWin
+        coins={coins}
+        onExit={onExit}
+        stakeName={stakeAt(stake).name}
+        nextStakeName={stake < STAKES.length ? stakeAt(stake + 1).name : null}
+      />
+    );
   }
   if (phase === "lost") {
     return <ChallengeLost blind={blind} onExit={onExit} />;
@@ -657,9 +718,14 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
         <span className={`hud-board${blind.isBoss ? " boss" : ""}`}>
           Ante {blind.ante} · {blind.isBoss ? "☠ " : ""}
           {blind.name}
+          {stake > 1 && (
+            <span className="stake-badge" style={{ ["--stake" as string]: stakeAt(stake).color }}>
+              {stakeAt(stake).name}
+            </span>
+          )}
         </span>
-        <span className="plays-pips" aria-label={`${playsLeft} of ${PLAYS_PER_BLIND} plays left`}>
-          {Array.from({ length: PLAYS_PER_BLIND }, (_, i) => (
+        <span className="plays-pips" aria-label={`${playsLeft} of ${playsPerBlind} plays left`}>
+          {Array.from({ length: playsPerBlind }, (_, i) => (
             <span key={i} className={`pip${i < playsLeft ? " on" : ""}`} />
           ))}
         </span>

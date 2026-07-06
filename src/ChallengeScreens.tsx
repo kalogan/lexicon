@@ -70,8 +70,15 @@ export function AnteBanner(props: {
 /* ── ChallengeWin ────────────────────────────────────────────────────────────
  * Victory — the final boss fell. Gold, a pop-in, and the run's coin haul.
  */
-export function ChallengeWin(props: { coins: number; onExit: () => void }): JSX.Element {
-  const { coins, onExit } = props;
+export function ChallengeWin(props: {
+  coins: number;
+  onExit: () => void;
+  /** The stake this run was cleared at (for the flavor line + unlock banner). */
+  stakeName?: string;
+  /** The next stake this win unlocked, if any. */
+  nextStakeName?: string | null;
+}): JSX.Element {
+  const { coins, onExit, stakeName, nextStakeName } = props;
   return (
     <div className="menu-veil">
       <ChallengeStyles />
@@ -79,7 +86,12 @@ export function ChallengeWin(props: { coins: number; onExit: () => void }): JSX.
         <div className="cs-win-burst" aria-hidden="true" />
         <div className="cs-win-eyebrow">Challenge Cleared</div>
         <div className="cs-win-title">YOU WON</div>
-        <p className="cs-win-line">You built an engine that conquered all 5 antes.</p>
+        <p className="cs-win-line">
+          {stakeName
+            ? `You conquered all 5 antes at ${stakeName} stake.`
+            : "You built an engine that conquered all 5 antes."}
+        </p>
+        {nextStakeName && <div className="cs-unlock">🔓 {nextStakeName} Stake unlocked</div>}
 
         <div className="cs-coins" aria-label={`${coins} coins`}>
           <span aria-hidden="true">🪙</span>
@@ -283,6 +295,18 @@ const CHALLENGE_CSS = `
   font-size: 14px;
   line-height: 1.4;
   color: var(--lex-muted);
+}
+.cs-unlock {
+  position: relative;
+  margin-top: 10px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--lex-accent-deep);
+  background: rgba(217, 138, 61, 0.16);
+  border: 1px solid rgba(217, 138, 61, 0.4);
 }
 .cs-coins {
   position: relative;
