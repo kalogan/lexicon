@@ -56,6 +56,35 @@
   100% { opacity: 1; }
 }
 
+/* Tongue: a quick flick out (stroke draws on) that locks, with a sticky tip that
+   pops on when it lands. Sequenced just after the eyes open. */
+.studio-tongue-body {
+  fill: none;
+  stroke: #e0637a;
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-dasharray: 210;
+  stroke-dashoffset: 210;
+  animation: studioTongue 2.9s ease forwards;
+}
+@keyframes studioTongue {
+  0%, 72% { stroke-dashoffset: 210; }
+  86% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 0; }
+}
+.studio-tongue-tip {
+  fill: #d24e66;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: studioTongueTip 2.9s ease forwards;
+}
+@keyframes studioTongueTip {
+  0%, 84% { opacity: 0; transform: scale(0.3); }
+  91% { opacity: 1; transform: scale(1.2); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
 /* Reduced motion: drop the draw-on + scale, keep gentle fades. */
 @media (prefers-reduced-motion: reduce) {
   .studio-thread {
@@ -66,6 +95,19 @@
     transform: none;
     animation: studioGooberReduced 2.4s ease forwards;
   }
+  .studio-tongue-body {
+    stroke-dashoffset: 0;
+    animation: studioFadeInLate 2.9s ease forwards;
+  }
+  .studio-tongue-tip {
+    transform: none;
+    animation: studioFadeInLate 2.9s ease forwards;
+  }
+}
+@keyframes studioFadeInLate {
+  0%, 68% { opacity: 0; }
+  84% { opacity: 1; }
+  100% { opacity: 1; }
 }
 @keyframes studioThreadReduced {
   0% { opacity: 0; }

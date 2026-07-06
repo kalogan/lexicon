@@ -50,6 +50,11 @@ function WovenwildArt() {
         <circle cx={179.5} cy={130.5} r={2.4} className="studio-glint" />
         <circle cx={228.5} cy={135.5} r={2} className="studio-glint" />
       </g>
+      {/* Tongue: flicks out just after the eyes open and locks with a sticky tip. */}
+      <g className="studio-tongue">
+        <path className="studio-tongue-body" d="M200,200 Q268,236 332,252" />
+        <circle className="studio-tongue-tip" cx={332} cy={252} r={9} />
+      </g>
     </svg>
   );
 }

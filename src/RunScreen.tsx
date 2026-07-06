@@ -154,6 +154,8 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   }, [board, overrides]);
   // Tap a relic to inspect it (rules + live accrued value).
   const [inspect, setInspect] = useState<Card | null>(null);
+  // Confirm before the ✕ abandons the run.
+  const [confirmExit, setConfirmExit] = useState(false);
   // Meta: deepest board ever reached (persists across runs).
   const bestDepth = useRef(Number(localStorage.getItem("lexicon:bestDepth") ?? 0));
   const [newRecord, setNewRecord] = useState(false);
@@ -439,7 +441,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     <div className="run">
       {/* Top bar: exit · score+mult (center) · coins */}
       <header className="hud-top">
-        <button className="icon-btn" aria-label="Exit" onClick={onExit}>
+        <button className="icon-btn" aria-label="Abandon run" onClick={() => setConfirmExit(true)}>
           ✕
         </button>
         <div className="hud-score">
@@ -651,6 +653,24 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
               </button>
               <button className="btn primary" onClick={advanceBoard}>
                 Continue →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Abandon-run confirmation */}
+      {confirmExit && (
+        <div className="menu-veil" onClick={() => setConfirmExit(false)}>
+          <div className="confirm-card" onClick={(e) => e.stopPropagation()}>
+            <div className="menu-title">Abandon this run?</div>
+            <div className="confirm-sub">You'll lose this board, your relics, and your progress.</div>
+            <div className="confirm-actions">
+              <button className="btn primary" onClick={() => setConfirmExit(false)}>
+                Keep playing
+              </button>
+              <button className="btn danger" onClick={onExit}>
+                Abandon run
               </button>
             </div>
           </div>

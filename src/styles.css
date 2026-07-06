@@ -337,6 +337,11 @@ body,
   border-color: transparent;
   color: var(--lex-muted);
 }
+.btn.danger {
+  background: var(--lex-bad);
+  color: #fff;
+  border-color: transparent;
+}
 
 /* ── Juice ───────────────────────────────────────────────────────────────── */
 /* Tiles cascade in on each new round. `backwards` holds the start state during
@@ -984,6 +989,31 @@ body,
   color: #fff;
 }
 .letterpick-key:active { transform: translateY(0); }
+
+/* Abandon-run confirmation modal */
+.confirm-card {
+  width: min(88vw, 340px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fbf7ee;
+  border-radius: 22px;
+  padding: 22px 20px;
+  box-shadow: 0 24px 70px rgba(20, 14, 30, 0.4);
+  text-align: center;
+  animation: pop-in 0.28s ease;
+}
+.confirm-sub {
+  color: var(--lex-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 6px;
+}
 
 /* The shop — a distinct "vault" panel so it doesn't read like the draft */
 .shop-card {
