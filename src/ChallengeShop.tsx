@@ -20,6 +20,7 @@ import { useState } from "react";
 import type { JSX } from "react";
 import type { Card } from "./run/engine.js";
 import type { Tile } from "./run/deck.js";
+import type { Charm } from "./run/charms.js";
 import { deckComposition } from "./run/deck.js";
 import { RelicCard } from "./RelicCard.js";
 
@@ -28,14 +29,23 @@ export interface ShopRelic {
   price: number;
 }
 
+export interface ShopCharm {
+  charm: Charm;
+  price: number;
+}
+
 export interface ChallengeShopProps {
   coins: number;
   deck: readonly Tile[];
   relics: readonly ShopRelic[];
+  charms: readonly ShopCharm[];
+  /** True when the charm slots are full — buying is blocked with a hint. */
+  charmSlotsFull: boolean;
   addLetterCost: number;
   removeTileCost: number;
   rerollCost: number;
   onBuyRelic: (card: Card) => void;
+  onBuyCharm: (charm: Charm) => void;
   onAddLetter: (letter: string) => void;
   onRemoveTile: (letter: Tile) => void;
   onReroll: () => void;
@@ -54,10 +64,13 @@ export function ChallengeShop(props: ChallengeShopProps): JSX.Element {
     coins,
     deck,
     relics,
+    charms,
+    charmSlotsFull,
     addLetterCost,
     removeTileCost,
     rerollCost,
     onBuyRelic,
+    onBuyCharm,
     onAddLetter,
     onRemoveTile,
     onReroll,
@@ -116,6 +129,36 @@ export function ChallengeShop(props: ChallengeShopProps): JSX.Element {
                   onClick={() => onBuyRelic(card)}
                 />
               ))}
+            </div>
+          )}
+        </section>
+
+        {/* ── Charms for sale ────────────────────────────────────────────── */}
+        <section className="cshop__section" aria-label="Charms for sale">
+          <h3 className="cshop__h">
+            Charms {charmSlotsFull && <span className="cshop__full">· slots full</span>}
+          </h3>
+          {charms.length === 0 ? (
+            <p className="cshop__soldout">Sold out — spent the shelf.</p>
+          ) : (
+            <div className="cshop__charms">
+              {charms.map(({ charm, price }) => {
+                const disabled = coins < price || charmSlotsFull;
+                return (
+                  <button
+                    key={charm.id}
+                    type="button"
+                    className={`cshop__charm cshop__charm--${charm.rarity}`}
+                    disabled={disabled}
+                    onClick={() => onBuyCharm(charm)}
+                    aria-label={`Buy ${charm.name} for ${price} coins — ${charm.blurb}`}
+                  >
+                    <span className="cshop__charmName">{charm.name}</span>
+                    <span className="cshop__charmBlurb">{charm.blurb}</span>
+                    <span className="cshop__charmPrice">🪙 {price}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </section>
@@ -271,6 +314,56 @@ const SHOP_CSS = `
   font-size: 13px;
   color: rgba(244, 239, 228, 0.6);
   font-style: italic;
+}
+.cshop__full {
+  color: var(--lex-bad);
+  font-weight: 800;
+}
+
+/* ── Charms shelf ── */
+.cshop__charms {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.cshop__charm {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(251, 247, 238, 0.1);
+  border: 1px solid rgba(251, 247, 238, 0.18);
+  border-left-width: 3px;
+  color: #f4efe4;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: transform 0.1s ease, background 0.1s ease;
+}
+.cshop__charm:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: rgba(251, 247, 238, 0.16);
+}
+.cshop__charm:active:not(:disabled) { transform: translateY(0); }
+.cshop__charm:disabled { opacity: 0.42; cursor: not-allowed; }
+.cshop__charm--common { border-left-color: rgba(244, 239, 228, 0.5); }
+.cshop__charm--uncommon { border-left-color: #6fb3a0; }
+.cshop__charm--rare { border-left-color: #6aa0e0; }
+.cshop__charm--legendary { border-left-color: #d98a3d; }
+.cshop__charmName { font-weight: 800; font-size: 14px; }
+.cshop__charmBlurb {
+  font-size: 11px;
+  color: rgba(244, 239, 228, 0.7);
+  line-height: 1.25;
+}
+.cshop__charmPrice {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--lex-accent);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Deck viewer ── */

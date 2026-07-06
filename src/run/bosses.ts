@@ -139,3 +139,17 @@ export const BOSSES: readonly Boss[] = [
 export function randomBoss(seed: number): Boss {
   return BOSSES[createRng(seed >>> 0).int(BOSSES.length)]!;
 }
+
+/**
+ * Bosses eligible for CHALLENGE-mode boss blinds: the "debuff" bosses — word
+ * constraints + light seals. The one-word showdowns are excluded: Challenge
+ * blinds accumulate a target over several plays, so "the board ends after one
+ * word" doesn't fit that loop (and would be brutally swingy against a fixed
+ * target). Leaves 9 bosses of real variety.
+ */
+export const CHALLENGE_BOSSES: readonly Boss[] = BOSSES.filter((b) => !b.oneWord);
+
+/** Deterministically pick a Challenge boss from {@link CHALLENGE_BOSSES}. */
+export function challengeBoss(seed: number): Boss {
+  return CHALLENGE_BOSSES[createRng(seed >>> 0).int(CHALLENGE_BOSSES.length)]!;
+}

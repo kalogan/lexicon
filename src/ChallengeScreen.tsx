@@ -11,7 +11,7 @@
  * the build.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { canExtend, pathWord, MIN_WORD_LEN } from "./board.js";
+import { canExtend, pathWord, MIN_WORD_LEN, type Board } from "./board.js";
 import { readyDictionary, loadDictionary, type Dictionary } from "./dictionary.js";
 import { scoreWord, makeRunState, type RunState, type Card, type Breakdown } from "./run/engine.js";
 import { DRAFT_POOL } from "./run/cards.js";
@@ -26,14 +26,17 @@ import {
 } from "./run/deck.js";
 import {
   blindAtStep,
+  blindTarget,
   isWin,
   TOTAL_ANTES,
   TOTAL_BLINDS,
   type Blind,
 } from "./run/challenge.js";
+import { challengeBoss, type Boss } from "./run/bosses.js";
+import { STARTER_CHARM, randomCharm, type Charm } from "./run/charms.js";
 import { RelicCard } from "./RelicCard.js";
 import * as meta from "./meta.js";
-import { ChallengeShop, type ShopRelic } from "./ChallengeShop.js";
+import { ChallengeShop, type ShopRelic, type ShopCharm } from "./ChallengeShop.js";
 import { AnteBanner, ChallengeWin, ChallengeLost } from "./ChallengeScreens.js";
 import { sound } from "./sound.js";
 import { music } from "./music.js";
@@ -41,10 +44,18 @@ import { music } from "./music.js";
 const SIZE = 6;
 const PLAYS_PER_BLIND = 6;
 const DISCARDS_PER_BLIND = 3;
+const MAX_CHARMS = 3; // consumable slots
 const PRICE: Record<Card["rarity"], number> = { common: 4, uncommon: 6, rare: 8, legendary: 12 };
+// Charms are one-shot, so they price well under persistent relics.
+const CHARM_PRICE: Record<Card["rarity"], number> = { common: 2, uncommon: 3, rare: 5, legendary: 8 };
 const ADD_LETTER_COST = 3;
 const REMOVE_TILE_COST = 2;
 const REROLL_COST = 2;
+/** Boss blinds already carry a ×1.8 target; the constraint adds difficulty, so
+ *  we soften the target toward the boss's Endless discount — blended, not full,
+ *  so a boss blind still out-targets the Big blind of its ante. */
+const BOSS_SOFTEN = 0.5;
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""); // Transmute letter picker
 
 function buzz(pattern: number | number[]) {
   try {
@@ -90,6 +101,20 @@ function pickRelics(n = 3): ShopRelic[] {
   return out;
 }
 
+/** Two distinct charms for the shop shelf (rarity-weighted, like Endless drops). */
+function pickCharms(n = 2): ShopCharm[] {
+  const out: ShopCharm[] = [];
+  const used = new Set<string>();
+  let guard = 0;
+  while (out.length < n && guard++ < 200) {
+    const charm = randomCharm(Math.floor(Math.random() * 1e9));
+    if (used.has(charm.id)) continue;
+    used.add(charm.id);
+    out.push({ charm, price: CHARM_PRICE[charm.rarity] });
+  }
+  return out;
+}
+
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 export function ChallengeScreen({ onExit }: { onExit: () => void }) {
@@ -118,14 +143,52 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   const [flash, setFlash] = useState<Set<string>>(() => new Set());
   const [fly, setFly] = useState<{ id: number; total: number } | null>(null);
   const [shopStock, setShopStock] = useState<ShopRelic[]>([]);
+  const [charmStock, setCharmStock] = useState<ShopCharm[]>([]);
   const [inspect, setInspect] = useState<Card | null>(null);
   const [achToast, setAchToast] = useState<string | null>(null);
+  // Consumable charms: held in a few slots, tapped to fire, then spent.
+  const [charms, setCharms] = useState<Charm[]>(() => [STARTER_CHARM]);
+  const [doubleNext, setDoubleNext] = useState(false); // Spotlight: next word ×2
+  const [sealsCleared, setSealsCleared] = useState(false); // Locksmith: unseal this board
+  const [charmToast, setCharmToast] = useState<string | null>(null);
+  const [overrides, setOverrides] = useState<Record<number, string>>({}); // Transmute tile→letter
+  const [transmute, setTransmute] = useState<{ charmIdx: number; target: number | null } | null>(null);
+  // Per-run salt so boss blinds vary run-to-run (deterministic within a run).
+  const [runSalt] = useState(() => Date.now() >>> 0);
 
   const tracing = useRef(false);
   const ending = useRef(false);
 
   const blind: Blind = blindAtStep(step) ?? blindAtStep(TOTAL_BLINDS - 1)!;
-  const target = blind.target;
+  // Boss blinds carry a boss (a "debuff": word rule and/or sealed tiles). Stable
+  // per step within a run; varies across runs via runSalt.
+  const boss: Boss | null = useMemo(
+    () => (blind.isBoss ? challengeBoss(blind.step ^ runSalt) : null),
+    [blind.isBoss, blind.step, runSalt],
+  );
+  // The boss's target discount, blended so a boss blind still out-targets its Big
+  // blind (the constraint supplies the rest of the difficulty).
+  const target = useMemo(() => {
+    if (!boss) return blind.target;
+    const softened = Math.round(blind.target * (BOSS_SOFTEN + (1 - BOSS_SOFTEN) * boss.targetMult));
+    return Math.max(blindTarget(blind.ante, 1) + 1, softened);
+  }, [boss, blind.target, blind.ante]);
+  // Sealed cells for a boss board (unless a charm shattered them this blind).
+  const blocked = useMemo(
+    () => new Set(sealsCleared ? [] : boss?.blocked?.(SIZE, boardSeed) ?? []),
+    [boss, boardSeed, sealsCleared],
+  );
+  // The board the player actually spells on: deck letters with Transmute overrides.
+  const effBoard: Board = useMemo(() => {
+    if (Object.keys(overrides).length === 0) return board;
+    return {
+      ...board,
+      cells: board.cells.map((c, i) => {
+        const o = overrides[i];
+        return o ? { label: o.toUpperCase(), value: o.toLowerCase() } : c;
+      }),
+    };
+  }, [board, overrides]);
   const ready = dict !== null;
   const pct = Math.min(100, Math.round((boardScore / target) * 100));
 
@@ -193,6 +256,10 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     setDiscardsLeft(DISCARDS_PER_BLIND);
     setFound(new Set());
     setPath([]);
+    setDoubleNext(false); // per-blind charm effects reset
+    setSealsCleared(false);
+    setOverrides({});
+    setTransmute(null);
     setRun((r) => ({ ...r, boardWords: 0, lastFirst: null }));
     setPhase("play");
   };
@@ -208,7 +275,16 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
       setPhase("won"); // cleared the final boss
       return;
     }
+    // Boss spoils: clearing a boss blind drops a charm if a slot is free.
+    if (boss && charms.length < MAX_CHARMS) {
+      const got = randomCharm(Date.now());
+      setCharms((cs) => (cs.length < MAX_CHARMS ? [...cs, got] : cs));
+      const msg = `✦ ${got.name}`;
+      setCharmToast(msg);
+      window.setTimeout(() => setCharmToast((m) => (m === msg ? null : m)), 1800);
+    }
     setShopStock(pickRelics());
+    setCharmStock(pickCharms());
     setPhase("shop");
   };
 
@@ -226,7 +302,7 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
 
   // ── Play ────────────────────────────────────────────────────────────────────
   const extendTo = (i: number) => {
-    if (i < 0 || phase !== "play") return;
+    if (i < 0 || phase !== "play" || blocked.has(i)) return;
     setPath((p) => {
       let np = p;
       if (p.length && p[p.length - 1] === i) np = p;
@@ -241,15 +317,29 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     tracing.current = false;
     const cur = path;
     setPath([]);
-    if (cur.length < MIN_WORD_LEN || !dict) return;
-    const word = pathWord(cur, board);
+    if (transmute || cur.length < MIN_WORD_LEN || !dict) return;
+    const word = pathWord(cur, effBoard);
     if (word.length < MIN_WORD_LEN || found.has(word) || !dict.has(word)) {
       sound.invalid();
       buzz(25);
       return;
     }
-    const b = scoreWord(word, relics, run);
-    const total = b.total;
+    // Boss word rule: the word must satisfy the constraint to score.
+    if (boss?.allow && !boss.allow(word, found)) {
+      sound.invalid();
+      buzz([0, 22, 40, 22]);
+      return;
+    }
+    const raw = scoreWord(word, relics, run);
+    const triggers = [...raw.triggers];
+    let total = raw.total;
+    // Spotlight/Limelight charm: this word (only) scores ×2, then it's spent.
+    if (doubleNext) {
+      total *= 2;
+      triggers.push({ card: "Spotlight", detail: "×2" });
+      setDoubleNext(false);
+    }
+    const b: Breakdown = { ...raw, total, triggers };
     setFound((f) => new Set(f).add(word));
     setBoardScore((s) => s + total);
     setRun((r) => commit(r, b, relics));
@@ -277,13 +367,69 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   };
 
   const discard = () => {
-    if (phase !== "play" || discardsLeft <= 0) return;
+    if (phase !== "play" || discardsLeft <= 0 || transmute) return;
     setDiscardsLeft((d) => d - 1);
     setBoardSeed(Date.now());
+    setOverrides({}); // overrides belonged to the old letters
     setFound(new Set());
     setPath([]);
     sound.tap();
     buzz(12);
+  };
+
+  // Fire a charm: apply its one-shot effect, then consume it. Play-phase only.
+  const useCharm = (charm: Charm, idx: number) => {
+    if (phase !== "play" || transmute) return; // one interaction at a time
+    const e = charm.effect;
+    // Transmute is interactive (pick a tile → pick a letter); consumed on completion.
+    if (e.kind === "transmute") {
+      setTransmute({ charmIdx: idx, target: null });
+      buzz(12);
+      return;
+    }
+    switch (e.kind) {
+      case "plays":
+        setPlaysLeft((p) => p + e.count);
+        break;
+      case "reroll":
+        setBoardSeed(Date.now()); // new letters (target/score carry over)
+        setOverrides({});
+        setFound(new Set());
+        setPath([]);
+        break;
+      case "doubleNext":
+        setDoubleNext(true);
+        break;
+      case "clearSeals":
+        setSealsCleared(true);
+        break;
+      case "permaMult":
+        setRun((r) => ({ ...r, permaMult: r.permaMult + e.amount }));
+        break;
+    }
+    setCharms((cs) => cs.filter((_, i) => i !== idx));
+    const msg = `✦ ${charm.name}`;
+    setCharmToast(msg);
+    window.setTimeout(() => setCharmToast((m) => (m === msg ? null : m)), 1400);
+    sound.found(4);
+    buzz(20);
+  };
+
+  // Transmute step 2: a letter was chosen for the selected tile — override it,
+  // consume the charm, and close the flow.
+  const applyTransmute = (letter: string) => {
+    if (!transmute || transmute.target === null) return;
+    const tgt = transmute.target;
+    const charmIdx = transmute.charmIdx;
+    setOverrides((o) => ({ ...o, [tgt]: letter.toLowerCase() }));
+    setCharms((cs) => cs.filter((_, i) => i !== charmIdx));
+    setTransmute(null);
+    setPath([]);
+    const msg = "✦ Transmute";
+    setCharmToast(msg);
+    window.setTimeout(() => setCharmToast((m) => (m === msg ? null : m)), 1400);
+    sound.found(4);
+    buzz(20);
   };
 
   // ── Shop handlers ─────────────────────────────────────────────────────────────
@@ -295,6 +441,17 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     // Consume ONE matching offer (allows buying dup copies across shops → stacking).
     setShopStock((s) => {
       const i = s.findIndex((e) => e.card === card);
+      return i < 0 ? s : [...s.slice(0, i), ...s.slice(i + 1)];
+    });
+    sound.coin();
+  };
+  const buyCharm = (charm: Charm) => {
+    const price = CHARM_PRICE[charm.rarity];
+    if (coins < price || charms.length >= MAX_CHARMS) return;
+    setCoins((c) => c - price);
+    setCharms((cs) => (cs.length < MAX_CHARMS ? [...cs, charm] : cs));
+    setCharmStock((s) => {
+      const i = s.findIndex((e) => e.charm === charm);
       return i < 0 ? s : [...s.slice(0, i), ...s.slice(i + 1)];
     });
     sound.coin();
@@ -317,10 +474,11 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     if (coins < REROLL_COST) return;
     setCoins((c) => c - REROLL_COST);
     setShopStock(pickRelics());
+    setCharmStock(pickCharms());
     sound.tap();
   };
 
-  const cur = pathWord(path, board);
+  const cur = pathWord(path, effBoard);
   const preview =
     cur.length >= MIN_WORD_LEN && dict && dict.has(cur) && !found.has(cur) ? scoreWord(cur, relics, run) : null;
   const inspectAccrued = inspect?.accrued?.(run) ?? null;
@@ -384,7 +542,15 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     );
   }
   if (phase === "intro") {
-    return <AnteBanner blind={blind} totalAntes={TOTAL_ANTES} onStart={beginBlind} />;
+    return (
+      <AnteBanner
+        blind={blind}
+        totalAntes={TOTAL_ANTES}
+        onStart={beginBlind}
+        bossRule={boss ? { name: boss.name, blurb: boss.blurb } : null}
+        target={target}
+      />
+    );
   }
   if (phase === "won") {
     return <ChallengeWin coins={coins} onExit={onExit} />;
@@ -398,10 +564,13 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
         coins={coins}
         deck={letters}
         relics={shopStock}
+        charms={charmStock}
+        charmSlotsFull={charms.length >= MAX_CHARMS}
         addLetterCost={ADD_LETTER_COST}
         removeTileCost={REMOVE_TILE_COST}
         rerollCost={REROLL_COST}
         onBuyRelic={buyRelic}
+        onBuyCharm={buyCharm}
         onAddLetter={addTile}
         onRemoveTile={removeTile}
         onReroll={reroll}
@@ -462,6 +631,34 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
         </div>
       </div>
 
+      {boss && phase === "play" && (
+        <div className="boss-banner">
+          <span className="boss-name">☠ boss · {boss.name}</span>
+          <span className="boss-blurb">{boss.blurb}</span>
+        </div>
+      )}
+
+      {/* Charms — one-shot consumables. Tap to fire (spends it). */}
+      {charms.length > 0 && (
+        <div className="charm-tray">
+          <span className="charm-label">✦ charms</span>
+          <div className="charm-row">
+            {charms.map((ch, i) => (
+              <button
+                key={ch.id + i}
+                className={`charm charm--${ch.rarity}`}
+                disabled={phase !== "play" || !!transmute}
+                onClick={() => useCharm(ch, i)}
+                title={`${ch.name} — ${ch.blurb}`}
+              >
+                <span className="charm-name">{ch.name}</span>
+                <span className="charm-blurb">{ch.blurb}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="breakdown">
         {toast ? (
           <span className="bd-toast">
@@ -483,6 +680,10 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
       </div>
 
       {achToast && <div className="ach-toast" key={achToast}>{achToast} <span className="ach-toast-sub">unlocked</span></div>}
+      {charmToast && <div className="charm-toast" key={charmToast}>{charmToast}</div>}
+      {transmute && transmute.target === null && (
+        <div className="charm-toast transmute-hint">🔀 Transmute · tap a tile to change it</div>
+      )}
 
       {inspect && (
         <div className="menu-veil" onClick={() => setInspect(null)}>
@@ -502,10 +703,17 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
 
       <div className="board-wrap" style={{ width: "min(var(--run-w, 92vw), 520px, calc(100svh - 380px))" }}>
         <div
-          className="board"
+          className={`board${transmute && transmute.target === null ? " transmuting" : ""}`}
           style={{ gridTemplateColumns: `repeat(${SIZE}, 1fr)` }}
           onPointerDown={(e) => {
             if (phase !== "play") return;
+            // Transmute: first tap picks the tile to change (no tracing).
+            if (transmute && transmute.target === null) {
+              const cell = cellAt(e.clientX, e.clientY);
+              if (cell >= 0 && !blocked.has(cell)) setTransmute({ ...transmute, target: cell });
+              return;
+            }
+            if (transmute) return; // letter picker open — ignore the board
             (e.target as Element).releasePointerCapture?.(e.pointerId);
             tracing.current = true;
             extendTo(cellAt(e.clientX, e.clientY));
@@ -515,21 +723,42 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
           onPointerCancel={submit}
           onPointerLeave={() => tracing.current && submit()}
         >
-          {board.cells.map((c, i) => {
+          {effBoard.cells.map((c, i) => {
             const order = path.indexOf(i);
+            const isBlocked = blocked.has(i);
+            const isMorphed = overrides[i] !== undefined;
             return (
               <div
                 key={i}
                 data-cell={i}
-                className={`tile${order >= 0 ? " on" : ""}${order === path.length - 1 ? " head" : ""}`}
+                className={`tile${order >= 0 ? " on" : ""}${order === path.length - 1 ? " head" : ""}${isBlocked ? " blocked" : ""}${isMorphed ? " morphed" : ""}`}
                 style={{ ["--i" as string]: i }}
               >
-                {c.label}
+                {isBlocked ? "" : c.label}
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* Transmute step 2 — pick the new letter for the chosen tile */}
+      {transmute && transmute.target !== null && (
+        <div className="menu-veil" onClick={() => setTransmute(null)}>
+          <div className="letterpick" onClick={(e) => e.stopPropagation()}>
+            <div className="menu-title">Change “{effBoard.cells[transmute.target]?.label}” to…</div>
+            <div className="letterpick-grid">
+              {ALPHABET.map((ch) => (
+                <button key={ch} className="letterpick-key" onClick={() => applyTransmute(ch)}>
+                  {ch}
+                </button>
+              ))}
+            </div>
+            <button className="btn" onClick={() => setTransmute(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {boardScore >= target && phase === "play" && (
         <button className="btn primary next-btn" onClick={clearBlind}>

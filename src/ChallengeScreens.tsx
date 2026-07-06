@@ -25,9 +25,14 @@ export function AnteBanner(props: {
   blind: Blind;
   totalAntes: number;
   onStart: () => void;
+  /** The active boss (boss blinds only) — its rule is shown so the player can plan. */
+  bossRule?: { name: string; blurb: string } | null;
+  /** Effective target to show (boss blinds are softened below blind.target). */
+  target?: number;
 }): JSX.Element {
-  const { blind, totalAntes, onStart } = props;
+  const { blind, totalAntes, onStart, bossRule, target } = props;
   const boss = blind.isBoss;
+  const shown = target ?? blind.target;
   return (
     <div className="menu-veil">
       <ChallengeStyles />
@@ -42,14 +47,16 @@ export function AnteBanner(props: {
               ☠
             </span>
           )}
-          {blind.name}
+          {bossRule ? bossRule.name : blind.name}
         </div>
 
         {boss && <div className="cs-boss-tag">Boss Blind</div>}
 
+        {bossRule && <div className="cs-boss-rule">{bossRule.blurb}</div>}
+
         <div className="cs-target">
           <span className="cs-target-label">Target</span>
-          <span className="cs-target-num">{blind.target.toLocaleString()}</span>
+          <span className="cs-target-num">{shown.toLocaleString()}</span>
         </div>
 
         <button type="button" className="btn primary cs-cta" onClick={onStart} autoFocus>
@@ -193,6 +200,14 @@ const CHALLENGE_CSS = `
   border-radius: 999px;
   padding: 3px 12px;
   margin-top: 2px;
+}
+.cs-boss-rule {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--lex-ink);
+  max-width: 30ch;
 }
 .cs-target {
   display: flex;
