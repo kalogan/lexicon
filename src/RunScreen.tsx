@@ -28,6 +28,7 @@ function buzz(pattern: number | number[]) {
 const SIZE = 5;
 const TIME_BUDGET = 90;
 const MAX_CHARMS = 3; // consumable slots
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""); // Transmute letter picker
 // Target curve — eased from 1.7 to 1.45 so the mid-run wall (boards 4–6) is
 // reachable with a decent engine. board1≈100, 3≈210, 5≈442, 6(boss)≈641.
 const targetFor = (board: number) => Math.round(100 * Math.pow(1.45, board - 1));
@@ -107,6 +108,10 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const [doubleNext, setDoubleNext] = useState(false); // Spotlight charm: next word ×2
   const [sealsCleared, setSealsCleared] = useState(false); // Locksmith charm: unseal this board
   const [charmToast, setCharmToast] = useState<string | null>(null);
+  // Transmute charm: per-tile letter overrides ({cellIndex: newLetter}) + the
+  // interactive "tap a tile, then pick a letter" flow it opens.
+  const [overrides, setOverrides] = useState<Record<number, string>>({});
+  const [transmute, setTransmute] = useState<{ charmIdx: number; target: number | null } | null>(null);
   const blocked = useMemo(
     () => new Set(sealsCleared ? [] : boss?.blocked?.(SIZE, boardSeed) ?? []),
     [boss, boardSeed, sealsCleared],
@@ -122,6 +127,17 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     () => (boardMod?.card ? [...deck, boardMod.card] : deck),
     [deck, boardMod],
   );
+  // The board the player actually spells on: raw letters with Transmute overrides applied.
+  const effBoard: Board = useMemo(() => {
+    if (Object.keys(overrides).length === 0) return board;
+    return {
+      ...board,
+      cells: board.cells.map((c, i) => {
+        const o = overrides[i];
+        return o ? { label: o.toUpperCase(), value: o.toLowerCase() } : c;
+      }),
+    };
+  }, [board, overrides]);
   // Tap a relic to inspect it (rules + live accrued value).
   const [inspect, setInspect] = useState<Card | null>(null);
   // Meta: deepest board ever reached (persists across runs).
@@ -177,8 +193,8 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     tracing.current = false;
     const cur = path;
     setPath([]);
-    if (cur.length < MIN_WORD_LEN || !dict) return;
-    const word = pathWord(cur, board);
+    if (transmute || cur.length < MIN_WORD_LEN || !dict) return;
+    const word = pathWord(cur, effBoard);
     if (word.length < MIN_WORD_LEN || found.has(word) || !dict.has(word)) {
       sound.invalid();
       buzz(25);
@@ -235,14 +251,22 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
 
   // Fire a charm: apply its one-shot effect, then consume it. Play-phase only.
   const useCharm = (charm: Charm, idx: number) => {
-    if (phase !== "play") return;
+    if (phase !== "play" || transmute) return; // one interaction at a time
     const e = charm.effect;
+    // Transmute is interactive (pick a tile → pick a letter); it's consumed on
+    // completion, not now. Enter the flow and bail out of the instant path.
+    if (e.kind === "transmute") {
+      setTransmute({ charmIdx: idx, target: null });
+      buzz(12);
+      return;
+    }
     switch (e.kind) {
       case "time":
         setTimeLeft((t) => t + e.seconds);
         break;
       case "reroll":
         setBoardSeed(Date.now()); // new letters (target/time/score carry over)
+        setOverrides({}); // overrides belonged to the old letters
         setFound(new Set());
         setPath([]);
         break;
@@ -264,6 +288,23 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     buzz(20);
   };
 
+  // Transmute step 2: a letter was chosen for the selected tile — override it,
+  // consume the charm, and close the flow.
+  const applyTransmute = (letter: string) => {
+    if (!transmute || transmute.target === null) return;
+    const target = transmute.target;
+    const charmIdx = transmute.charmIdx;
+    setOverrides((o) => ({ ...o, [target]: letter.toLowerCase() }));
+    setCharms((cs) => cs.filter((_, i) => i !== charmIdx));
+    setTransmute(null);
+    setPath([]);
+    const msg = "✦ Transmute";
+    setCharmToast(msg);
+    window.setTimeout(() => setCharmToast((m) => (m === msg ? null : m)), 1400);
+    sound.found(4);
+    buzz(20);
+  };
+
   const advanceBoard = () => {
     const nb = boardIdx + 1;
     const newSeed = Date.now();
@@ -279,6 +320,8 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     setFound(new Set());
     setDoubleNext(false); // per-board charm effects reset
     setSealsCleared(false);
+    setOverrides({});
+    setTransmute(null);
     setRun((r) => ({ ...r, board: r.board + 1, boardWords: 0, lastFirst: null }));
     setPhase("play");
   };
@@ -340,7 +383,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     sound.tap();
   };
 
-  const cur = pathWord(path, board);
+  const cur = pathWord(path, effBoard);
   const previewRaw =
     cur.length >= MIN_WORD_LEN && dict && dict.has(cur) && !found.has(cur) ? scoreWord(cur, effectiveDeck, run) : null;
   // Reflect the gold tile in the live preview when the current trace crosses it.
@@ -421,6 +464,10 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
 
       {charmToast && <div className="charm-toast" key={charmToast}>{charmToast}</div>}
 
+      {transmute && transmute.target === null && (
+        <div className="charm-toast transmute-hint">🔀 Transmute · tap a tile to change it</div>
+      )}
+
       {boss && phase === "play" && (
         <div className="boss-banner">
           <span className="boss-name">☠ boss · {boss.name}</span>
@@ -457,10 +504,17 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
 
       <div className="board-wrap" style={{ width: "min(92vw, 420px, calc(100svh - 400px))" }}>
         <div
-          className="board"
+          className={`board${transmute && transmute.target === null ? " transmuting" : ""}`}
           style={{ gridTemplateColumns: `repeat(${SIZE}, 1fr)` }}
           onPointerDown={(e) => {
             if (phase !== "play") return;
+            // Transmute: first tap picks the tile to change (no tracing).
+            if (transmute && transmute.target === null) {
+              const cell = cellAt(e.clientX, e.clientY);
+              if (cell >= 0 && !blocked.has(cell)) setTransmute({ ...transmute, target: cell });
+              return;
+            }
+            if (transmute) return; // letter picker open — ignore the board
             (e.target as Element).releasePointerCapture?.(e.pointerId);
             tracing.current = true;
             extendTo(cellAt(e.clientX, e.clientY));
@@ -470,15 +524,16 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
           onPointerCancel={submit}
           onPointerLeave={() => tracing.current && submit()}
         >
-          {board.cells.map((c, i) => {
+          {effBoard.cells.map((c, i) => {
             const order = path.indexOf(i);
             const isBlocked = blocked.has(i);
             const isGold = i === goldTile;
+            const isMorphed = overrides[i] !== undefined;
             return (
               <div
                 key={i}
                 data-cell={i}
-                className={`tile${order >= 0 ? " on" : ""}${order === path.length - 1 ? " head" : ""}${isBlocked ? " blocked" : ""}${isGold ? " gold" : ""}`}
+                className={`tile${order >= 0 ? " on" : ""}${order === path.length - 1 ? " head" : ""}${isBlocked ? " blocked" : ""}${isGold ? " gold" : ""}${isMorphed ? " morphed" : ""}`}
                 style={{ ["--i" as string]: i }}
               >
                 {isBlocked ? "" : c.label}
@@ -545,6 +600,27 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
                 Continue →
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transmute step 2 — pick the new letter for the chosen tile */}
+      {transmute && transmute.target !== null && (
+        <div className="menu-veil" onClick={() => setTransmute(null)}>
+          <div className="letterpick" onClick={(e) => e.stopPropagation()}>
+            <div className="menu-title">
+              Change “{effBoard.cells[transmute.target]?.label}” to…
+            </div>
+            <div className="letterpick-grid">
+              {ALPHABET.map((ch) => (
+                <button key={ch} className="letterpick-key" onClick={() => applyTransmute(ch)}>
+                  {ch}
+                </button>
+              ))}
+            </div>
+            <button className="btn" onClick={() => setTransmute(null)}>
+              Cancel
+            </button>
           </div>
         </div>
       )}

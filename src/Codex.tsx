@@ -50,6 +50,8 @@ function charmIcon(charm: Charm): string {
       return "🗝️";
     case "permaMult":
       return "📈";
+    case "transmute":
+      return "🔀";
   }
 }
 

@@ -15,7 +15,8 @@ export type CharmEffect =
   | { kind: "reroll" }                       // re-roll the board's letters
   | { kind: "doubleNext" }                   // the next scored word counts ×2
   | { kind: "clearSeals" }                   // remove all sealed tiles this board (anti-boss)
-  | { kind: "permaMult"; amount: number };   // +amount PERMANENT mult for the rest of the run
+  | { kind: "permaMult"; amount: number }    // +amount PERMANENT mult for the rest of the run
+  | { kind: "transmute" };                   // change one board tile into any letter you pick
 
 export interface Charm {
   id: string;
@@ -79,6 +80,13 @@ export const CHARMS: readonly Charm[] = [
     blurb: "+1.0 permanent mult for the rest of this run.",
     rarity: "rare",
     effect: { kind: "permaMult", amount: 1 },
+  },
+  {
+    id: "charm-transmute",
+    name: "Transmute",
+    blurb: "Change one board tile into any letter you pick.",
+    rarity: "uncommon",
+    effect: { kind: "transmute" },
   },
 ];
 

@@ -819,6 +819,60 @@ body,
   padding: 7px 12px;
   animation: pop-in 0.3s ease;
 }
+/* Transmute: the "tap a tile" prompt + the board's pick-mode cue + a morphed tile */
+.transmute-hint {
+  color: #5f8fd0;
+  background: rgba(95, 143, 208, 0.16);
+}
+.board.transmuting .tile:not(.blocked) {
+  cursor: pointer;
+  animation: transmute-glow 1.3s ease-in-out infinite;
+}
+@keyframes transmute-glow {
+  0%, 100% { box-shadow: 0 3px 0 rgba(43,36,64,0.12), 0 6px 16px rgba(43,36,64,0.08); }
+  50% { box-shadow: 0 0 0 3px rgba(95,143,208,0.6), 0 6px 18px rgba(95,143,208,0.4); }
+}
+.tile.morphed {
+  box-shadow: 0 3px 0 rgba(95,143,208,0.5), 0 6px 16px rgba(95,143,208,0.35), inset 0 0 0 2px rgba(95,143,208,0.5);
+}
+
+/* Transmute letter picker — the A–Z grid */
+.letterpick {
+  width: min(92vw, 380px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #fbf7ee;
+  border-radius: 22px;
+  padding: 20px;
+  box-shadow: 0 24px 70px rgba(20, 14, 30, 0.4);
+  animation: pop-in 0.28s ease;
+}
+.letterpick-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+.letterpick-key {
+  appearance: none;
+  border: 1px solid rgba(43, 36, 64, 0.12);
+  background: var(--lex-tile);
+  color: var(--lex-ink);
+  font: inherit;
+  font-weight: 800;
+  font-size: 18px;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(43, 36, 64, 0.12);
+  transition: transform 0.1s ease, background 0.1s ease;
+}
+.letterpick-key:hover {
+  transform: translateY(-2px);
+  background: var(--lex-accent);
+  color: #fff;
+}
+.letterpick-key:active { transform: translateY(0); }
 
 /* The shop — a distinct "vault" panel so it doesn't read like the draft */
 .shop-card {

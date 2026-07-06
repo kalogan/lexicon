@@ -14,6 +14,7 @@ const EFFECT_KINDS: CharmEffect["kind"][] = [
   "doubleNext",
   "clearSeals",
   "permaMult",
+  "transmute",
 ];
 const RARITIES: Rarity[] = ["common", "uncommon", "rare", "legendary"];
 
