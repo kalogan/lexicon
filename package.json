@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "sim": "vitest run --config vitest.sim.config.ts"
   },
   "dependencies": {
     "an-array-of-english-words": "^2.0.0",
