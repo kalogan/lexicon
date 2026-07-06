@@ -7,11 +7,13 @@
  * This module is pure ladder geometry — targets, names, rewards, and the win
  * condition — with no board, no rng, no clock. Slice 3 drives a run through it.
  *
- * Target curve: base(ante) = round(100 · 2^(ante-1)), scaled within the ante by
+ * Target curve: base(ante) = round(75 · 2^(ante-1)), scaled within the ante by
  * small ×1.0, big ×1.35, boss ×1.8. Per-ante growth (2.0) exceeds the boss
  * multiplier (1.8), so the ladder is STRICTLY INCREASING across ante boundaries
  * too — the last blind of ante N is always below the first of ante N+1. It opens
- * near Endless board-1 (~100) and tops out at a 2,880-point capstone.
+ * gentle (~75) and tops out at a ~2,160-point capstone. (The base was cut 25%
+ * from 100 when the two free starter relics were removed — the opening draft's
+ * single 1-of-3 relic is a slower engine, so the ramp eases to match.)
  */
 
 export const TOTAL_ANTES = 5;
@@ -23,7 +25,7 @@ const BASE_REWARD = 4;
 const BOSS_BONUS = 4;
 
 /** Per-ante base target and the within-ante multipliers by blind index. */
-const BASE_TARGET = 100;
+const BASE_TARGET = 75; // cut 25% from 100 to ease the ramp (starter relics removed)
 const ANTE_GROWTH = 2.0;
 const BLIND_MULT: readonly number[] = [1.0, 1.35, 1.8]; // Small, Big, Boss
 const BLIND_NAMES: readonly string[] = ["Small Blind", "Big Blind", "Boss Blind"];

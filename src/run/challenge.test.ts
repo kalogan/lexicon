@@ -57,8 +57,8 @@ describe("target curve", () => {
 
   it("opens modest and ends on a multi-thousand capstone", () => {
     const targets = challengeBlinds().map((b) => b.target);
-    expect(targets[0]).toBeGreaterThanOrEqual(80);
-    expect(targets[0]).toBeLessThanOrEqual(120);
+    expect(targets[0]).toBeGreaterThanOrEqual(60);
+    expect(targets[0]).toBeLessThanOrEqual(100);
     expect(targets[targets.length - 1]).toBeGreaterThan(2000);
   });
 
