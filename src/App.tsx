@@ -67,7 +67,7 @@ export function App() {
 
   if (phase === "title") {
     const options: MenuOption[] = [
-      { label: "Challenge Mode", primary: true, onSelect: () => setPhase("run") },
+      { label: "Endless", primary: true, onSelect: () => setPhase("run") },
       { label: "Classic Mode", onSelect: () => setPhase("classic") },
       { label: "Codex", onSelect: () => setPhase("codex") },
     ];
