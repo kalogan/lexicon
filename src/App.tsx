@@ -1,11 +1,11 @@
 /**
  * LEXICON — a stylish word-hunt puzzle (Boggle lineage), built on game-kit as a
- * kit-hardening vehicle. Flow: tap-to-begin gate → studio ident → title (mode
- * select) → a round on the letter grid → results (with a solver-revealed best
- * possible word). Each difficulty keeps its own best score (kit `settings`).
+ * kit-hardening vehicle. Flow: studio ident → title (mode select) → a round on
+ * the letter grid → results (with a solver-revealed best possible word). Each
+ * difficulty keeps its own best score (kit `settings`).
  */
 import { useEffect, useState } from "react";
-import { StartGate, StudioIdent, TitleScreen } from "game-kit/title/r3f";
+import { StudioIdent, TitleScreen } from "game-kit/title/r3f";
 import type { MenuOption } from "game-kit/title";
 import { PlayScreen, type RoundResult } from "./PlayScreen.js";
 import { ResultsScreen } from "./ResultsScreen.js";
@@ -18,12 +18,12 @@ import { type Mode } from "./modes.js";
 import { sound } from "./sound.js";
 import * as store from "./store.js";
 
-type Phase = "gate" | "ident" | "title" | "play" | "results" | "run" | "classic" | "codex";
+type Phase = "ident" | "title" | "play" | "results" | "run" | "classic" | "codex";
 
 const DEFAULT_MODE: Mode = { id: "classic-4-180", label: "Classic", size: 4, durationSec: 180, blurb: "" };
 
 export function App() {
-  const [phase, setPhase] = useState<Phase>("gate");
+  const [phase, setPhase] = useState<Phase>("ident");
   const [mode, setMode] = useState<Mode>(DEFAULT_MODE);
   const [seed, setSeed] = useState(() => Date.now());
   const [result, setResult] = useState<RoundResult | null>(null);
@@ -56,18 +56,6 @@ export function App() {
     setPhase("results");
   };
 
-  if (phase === "gate") {
-    return (
-      <StartGate
-        label="tap to begin"
-        onBegin={() => {
-          sound.unlock();
-          setPhase("ident");
-        }}
-      />
-    );
-  }
-
   if (phase === "ident") {
     return <StudioIdent wordmark="WOVENWILD" tagline="games" onDone={() => setPhase("title")} />;
   }
@@ -86,6 +74,7 @@ export function App() {
         backdrop={<TitleBackdrop />}
         options={options}
         layout="split"
+        onFirstGesture={() => sound.unlock()}
       />
     );
   }

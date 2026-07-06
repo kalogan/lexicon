@@ -47,28 +47,29 @@ interface TileSpec {
   delay: number;
 }
 
-/* Hand-authored composition. ~18 tiles, biased toward the center-top empty
- * space but spread across the whole field. A sprinkle of Q/Z/X/J/K makes it
- * feel like a hoard of impossible words. Never spells LEXICON. */
+/* Hand-authored composition. ~18 tiles clustered in the BAND between the top
+ * wordmark and the bottom menu (y ≈ 27–64%), so the drift lives in the open
+ * middle of the split layout. A sprinkle of Q/Z/X/J/K makes it feel like a
+ * hoard of impossible words. Never spells LEXICON. */
 const TILES: readonly TileSpec[] = [
-  { letter: "Q", x: 18, y: 12, size: 84, opacity: 0.40, rotate: -8, dur: 15, delay: -2 },
-  { letter: "W", x: 44, y: 8, size: 58, opacity: 0.30, rotate: 6, dur: 18, delay: -7 },
-  { letter: "Z", x: 72, y: 14, size: 78, opacity: 0.42, rotate: 9, dur: 16, delay: -4 },
-  { letter: "A", x: 88, y: 26, size: 46, opacity: 0.22, rotate: -5, dur: 20, delay: -11 },
-  { letter: "T", x: 6, y: 30, size: 52, opacity: 0.26, rotate: 7, dur: 19, delay: -9 },
-  { letter: "J", x: 30, y: 24, size: 66, opacity: 0.36, rotate: 4, dur: 14, delay: -6 },
-  { letter: "E", x: 58, y: 22, size: 40, opacity: 0.20, rotate: -6, dur: 22, delay: -3 },
-  { letter: "K", x: 82, y: 40, size: 62, opacity: 0.32, rotate: 8, dur: 17, delay: -13 },
-  { letter: "R", x: 14, y: 46, size: 44, opacity: 0.22, rotate: -4, dur: 21, delay: -5 },
-  { letter: "X", x: 50, y: 38, size: 72, opacity: 0.34, rotate: 5, dur: 15, delay: -10 },
-  { letter: "O", x: 68, y: 32, size: 38, opacity: 0.18, rotate: -7, dur: 23, delay: -1 },
-  { letter: "N", x: 36, y: 48, size: 48, opacity: 0.20, rotate: 6, dur: 20, delay: -14 },
-  { letter: "S", x: 92, y: 56, size: 40, opacity: 0.16, rotate: -3, dur: 24, delay: -8 },
-  { letter: "V", x: 4, y: 62, size: 50, opacity: 0.18, rotate: 8, dur: 19, delay: -12 },
-  { letter: "M", x: 24, y: 68, size: 42, opacity: 0.15, rotate: -6, dur: 22, delay: -2 },
-  { letter: "P", x: 60, y: 60, size: 46, opacity: 0.16, rotate: 5, dur: 21, delay: -15 },
-  { letter: "I", x: 78, y: 72, size: 34, opacity: 0.12, rotate: -4, dur: 25, delay: -6 },
-  { letter: "G", x: 44, y: 76, size: 38, opacity: 0.13, rotate: 7, dur: 23, delay: -9 },
+  { letter: "Q", x: 16, y: 30, size: 82, opacity: 0.40, rotate: -8, dur: 13, delay: -2 },
+  { letter: "W", x: 46, y: 27, size: 52, opacity: 0.26, rotate: 6, dur: 15, delay: -7 },
+  { letter: "Z", x: 74, y: 31, size: 78, opacity: 0.42, rotate: 9, dur: 14, delay: -4 },
+  { letter: "S", x: 92, y: 33, size: 38, opacity: 0.18, rotate: -3, dur: 19, delay: -8 },
+  { letter: "V", x: 3, y: 34, size: 46, opacity: 0.18, rotate: 8, dur: 17, delay: -12 },
+  { letter: "B", x: 40, y: 36, size: 40, opacity: 0.16, rotate: -5, dur: 16, delay: -4 },
+  { letter: "J", x: 29, y: 43, size: 68, opacity: 0.38, rotate: 4, dur: 12, delay: -6 },
+  { letter: "E", x: 60, y: 41, size: 42, opacity: 0.20, rotate: -6, dur: 18, delay: -3 },
+  { letter: "A", x: 90, y: 45, size: 44, opacity: 0.22, rotate: -5, dur: 17, delay: -11 },
+  { letter: "T", x: 5, y: 47, size: 50, opacity: 0.24, rotate: 7, dur: 16, delay: -9 },
+  { letter: "X", x: 48, y: 50, size: 74, opacity: 0.36, rotate: 5, dur: 12, delay: -10 },
+  { letter: "G", x: 78, y: 46, size: 40, opacity: 0.16, rotate: 7, dur: 18, delay: -13 },
+  { letter: "I", x: 23, y: 53, size: 36, opacity: 0.16, rotate: -4, dur: 19, delay: -6 },
+  { letter: "O", x: 67, y: 54, size: 40, opacity: 0.18, rotate: -7, dur: 17, delay: -1 },
+  { letter: "R", x: 13, y: 60, size: 46, opacity: 0.22, rotate: -4, dur: 16, delay: -5 },
+  { letter: "K", x: 84, y: 59, size: 60, opacity: 0.32, rotate: 8, dur: 14, delay: -14 },
+  { letter: "N", x: 36, y: 62, size: 48, opacity: 0.20, rotate: 6, dur: 15, delay: -15 },
+  { letter: "P", x: 60, y: 63, size: 44, opacity: 0.17, rotate: 5, dur: 17, delay: -8 },
 ];
 
 export function TitleBackdrop() {
@@ -78,9 +79,9 @@ export function TitleBackdrop() {
       {TILES.map((t, i) => {
         // Per-tile drift/sway, derived arithmetically from the index so it's
         // deterministic (stable across re-renders) yet varied per tile.
-        const dx = ((i % 5) - 2) * 3; // -6..+6 px horizontal sway
-        const dy = 10 + (i % 4) * 4; // 10..22 px vertical float
-        const rot = t.rotate + (i % 2 === 0 ? 4 : -4); // rotation swing target
+        const dx = ((i % 5) - 2) * 7; // -14..+14 px horizontal sway
+        const dy = 18 + (i % 4) * 7; // 18..39 px vertical float
+        const rot = t.rotate + (i % 2 === 0 ? 8 : -8); // rotation swing target
         const style = {
           left: `${t.x}%`,
           top: `${t.y}%`,
@@ -121,10 +122,10 @@ const BACKDROP_CSS = `
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  /* Split layout: title up top, menu at the bottom — so keep tiles vivid in the
-     empty center and fade them behind both text zones (top + bottom) for legibility. */
-  -webkit-mask-image: radial-gradient(118% 96% at 50% 50%, #000 40%, transparent 94%);
-  mask-image: radial-gradient(118% 96% at 50% 50%, #000 40%, transparent 94%);
+  /* Split layout: the drift lives in the BAND between the top wordmark and the
+     bottom menu — a vertical mask fades tiles out behind both text zones. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 8%, #000 25%, #000 66%, transparent 88%);
+  mask-image: linear-gradient(to bottom, transparent 8%, #000 25%, #000 66%, transparent 88%);
 }
 
 .lex-bd__tile {
@@ -170,8 +171,8 @@ const BACKDROP_CSS = `
     opacity: var(--o);
   }
   50% {
-    transform: translate3d(var(--dx), calc(var(--dy) * -1), 0) rotate(var(--rot2)) scale(1.04);
-    opacity: calc(var(--o) * 1.25);
+    transform: translate3d(var(--dx), calc(var(--dy) * -1), 0) rotate(var(--rot2)) scale(1.08);
+    opacity: calc(var(--o) * 1.4);
   }
   100% {
     transform: translate3d(0, 0, 0) rotate(var(--rot)) scale(1);
