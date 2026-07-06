@@ -431,58 +431,54 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
 
   return (
     <div className="run">
-      <div className="run-header">
+      {/* Compact top bar: exit · board · coins */}
+      <header className="hud-top">
         <button className="icon-btn" aria-label="Exit" onClick={onExit}>
           ✕
         </button>
+        <span className="hud-board">
+          Board {boardIdx}
+          {boss ? " · boss" : ""}
+        </span>
         <div className="coins" key={coins}>
           🪙 {coins}
         </div>
-      </div>
-
-      <header className="run-top">
-        <div className="stat">
-          <span className="stat-num" key={boardScore}>{boardScore}</span>
-          <span className="stat-label">board {boardIdx}</span>
-          {fly && (
-            <span key={fly.id} className="score-fly">
-              +{fly.total}
-            </span>
-          )}
-        </div>
-        <div className={`stat timer${running && timeLeft <= 10 ? " low" : ""}`}>
-          <span className="stat-num">{Math.max(0, timeLeft)}s</span>
-          <span className="stat-label">time</span>
-        </div>
-        <div className="stat">
-          <span className="stat-num">{target}</span>
-          <span className="stat-label">target</span>
-        </div>
       </header>
 
+      {/* Score hero — the number you grow, with the target folded into the bar */}
+      <div className="score-hero">
+        <span className="score-big" key={boardScore}>{boardScore}</span>
+        <span className="score-target">/ {target}</span>
+        {fly && (
+          <span key={fly.id} className="score-fly">
+            +{fly.total}
+          </span>
+        )}
+      </div>
       <div className="target-bar">
         <div className="target-fill" style={{ width: `${pct}%` }} />
       </div>
 
-      <div className="plays-row">
+      {/* Resources: plays (primary) · time (safety net) · reshuffle */}
+      <div className="resource-row">
         <span className="plays-pips" aria-label={`${playsLeft} of ${PLAYS_PER_BOARD} plays left`}>
           {Array.from({ length: PLAYS_PER_BOARD }, (_, i) => (
             <span key={i} className={`pip${i < playsLeft ? " on" : ""}`} />
           ))}
         </span>
-        <span className="plays-label">plays</span>
+        <span className={`hud-time${running && timeLeft <= 10 ? " low" : ""}`}>{Math.max(0, timeLeft)}s</span>
         <button
           className="discard-btn"
           disabled={phase !== "play" || discardsLeft <= 0 || !!transmute}
           onClick={discard}
         >
-          ↻ reshuffle · {discardsLeft}
+          ↻ {discardsLeft}
         </button>
       </div>
 
       {/* Your relics — the engine you're building. They glow when they fire. */}
       <div className="deck-wrap">
-        <span className="deck-label">◈ your relics · {deck.length} · tap to inspect</span>
+        <span className="deck-label">◈ relics · {deck.length}</span>
         <div className="deck">
           {deck.map((c, i) => (
             <RelicCard key={c.id + i} card={c} mode="chip" flash={flash.has(c.name)} onClick={() => setInspect(c)} />
@@ -493,7 +489,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
       {/* Charms — one-shot consumables. Tap to fire (spends it). */}
       {charms.length > 0 && (
         <div className="charm-tray">
-          <span className="charm-label">✦ charms · tap to use</span>
+          <span className="charm-label">✦ charms</span>
           <div className="charm-row">
             {charms.map((ch, i) => (
               <button
