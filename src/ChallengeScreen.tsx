@@ -76,7 +76,7 @@ function commit(run: RunState, b: Breakdown, deck: readonly Card[]): RunState {
   };
 }
 
-function pickRelics(n = 4): ShopRelic[] {
+function pickRelics(n = 3): ShopRelic[] {
   const out: ShopRelic[] = [];
   const used = new Set<number>();
   while (out.length < n && used.size < DRAFT_POOL.length) {
