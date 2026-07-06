@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { TitleScreen } from "game-kit/title/r3f";
 import { StudioLogo } from "./StudioLogo.js";
+import { LexiconWordmark } from "./LexiconWordmark.js";
 import type { MenuOption } from "game-kit/title";
 import { PlayScreen, type RoundResult } from "./PlayScreen.js";
 import { ResultsScreen } from "./ResultsScreen.js";
@@ -72,7 +73,7 @@ export function App() {
     ];
     return (
       <TitleScreen
-        title="LEXICON"
+        title={<LexiconWordmark />}
         subtitle="Build impossible vocabulary engines."
         titleColor="#2b2440"
         backdrop={<TitleBackdrop />}

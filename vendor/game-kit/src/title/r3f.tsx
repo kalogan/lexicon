@@ -281,8 +281,10 @@ export function StudioIdent({
 export interface TitleScreenProps {
   /** Full-screen visual behind the overlay (a <Canvas>, a CSS motif, an <img>). */
   backdrop?: ReactNode;
-  /** Game wordmark (e.g. "CHIMERA"). */
-  title: string;
+  /** Game wordmark — a string (e.g. "CHIMERA") or custom art (e.g. a tiled
+   *  wordmark). A string renders in the kit's default wordmark style; a node
+   *  brings its own look. */
+  title: string | ReactNode;
   /** One-line premise under the title. */
   subtitle?: string;
   /** Menu options, top to bottom (typically 2–4). */

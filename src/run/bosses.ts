@@ -36,9 +36,9 @@ export const BOSSES: readonly Boss[] = [
   {
     id: "librarian",
     name: "The Librarian",
-    blurb: "Only words of 5+ letters count.",
-    allow: (w) => w.length >= 5,
-    targetMult: 0.55,
+    blurb: "Only words of 4+ letters count.",
+    allow: (w) => w.length >= 4,
+    targetMult: 0.7,
   },
   {
     id: "minimalist",
