@@ -37,6 +37,16 @@ import { challengeModifier, goldCell, type BoardMod } from "./run/modifiers.js";
 import { STAKES, stakeRules, stakeAt, clampStake } from "./run/stakes.js";
 import { unlockedRelicIds } from "./run/unlocks.js";
 import { STARTER_CHARM, randomCharm, type Charm } from "./run/charms.js";
+import {
+  saveRun,
+  clearRun,
+  toRunSnap,
+  fromRunSnap,
+  relicsFromIds,
+  charmsFromIds,
+  SNAP_VERSION,
+  type ChallengeSnapshot,
+} from "./run/persist.js";
 import { RelicCard } from "./RelicCard.js";
 import * as meta from "./meta.js";
 import { ChallengeShop, type ShopRelic, type ShopCharm } from "./ChallengeShop.js";
@@ -120,24 +130,28 @@ function pickCharms(n = 2): ShopCharm[] {
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
-export function ChallengeScreen({ onExit }: { onExit: () => void }) {
+export function ChallengeScreen({ onExit, resume }: { onExit: () => void; resume?: ChallengeSnapshot | null }) {
   const [dict, setDict] = useState<Dictionary | null>(() => readyDictionary());
   // No free starter relics — you DRAFT your first relic (1 of 3) at the opening.
-  const [relics, setRelics] = useState<Card[]>(() => []);
-  const [letters, setLetters] = useState<Tile[]>(() => [...STARTER_LETTER_DECK]);
-  const [coins, setCoins] = useState(0);
-  const [step, setStep] = useState(0); // which blind (0..TOTAL_BLINDS-1)
+  const [relics, setRelics] = useState<Card[]>(() => (resume ? relicsFromIds(resume.relics) : []));
+  const [letters, setLetters] = useState<Tile[]>(() =>
+    resume ? [...resume.letters] : [...STARTER_LETTER_DECK],
+  );
+  const [coins, setCoins] = useState(() => resume?.coins ?? 0);
+  const [step, setStep] = useState(() => resume?.step ?? 0); // which blind (0..TOTAL_BLINDS-1)
   // Difficulty stake for this run. Players who've won pick their stake up front;
   // first-timers skip straight to the draft at Stake I.
-  const [stake, setStake] = useState(() => clampStake(meta.getStats().topStakeUnlocked));
+  const [stake, setStake] = useState(() => resume?.stake ?? clampStake(meta.getStats().topStakeUnlocked));
   const [phase, setPhase] = useState<
     "howto" | "stake" | "draft" | "draftRelic" | "intro" | "play" | "shop" | "won" | "lost"
   >(() =>
-    !meta.hasFlag("challenge-howto")
-      ? "howto"
-      : meta.getStats().topStakeUnlocked > 1
-        ? "stake"
-        : "draft",
+    resume
+      ? resume.phase
+      : !meta.hasFlag("challenge-howto")
+        ? "howto"
+        : meta.getStats().topStakeUnlocked > 1
+          ? "stake"
+          : "draft",
   );
   // Opening draft: choose 5 of 10 offered letters to add to the base deck.
   const [offer] = useState(() => letterOffer(10));
@@ -150,32 +164,44 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   // Opening draft: choose 1 of 3 relics to seed your engine.
   const [relicOffer] = useState(() => pickRelics(pool, 3).map((r) => r.card));
 
-  const [boardSeed, setBoardSeed] = useState(() => Date.now());
+  const [boardSeed, setBoardSeed] = useState(() => resume?.boardSeed ?? Date.now());
   const board = useMemo(() => makeBoardFromDeck(letters, boardSeed, SIZE), [letters, boardSeed]);
-  const [boardScore, setBoardScore] = useState(0);
-  const [run, setRun] = useState<RunState>(() => makeRunState());
+  const [boardScore, setBoardScore] = useState(() => resume?.boardScore ?? 0);
+  const [run, setRun] = useState<RunState>(() => (resume ? fromRunSnap(resume.run) : makeRunState()));
   // Best single word this run (for the post-run recap).
-  const [bestWord, setBestWord] = useState<{ word: string; score: number } | null>(null);
-  const [playsLeft, setPlaysLeft] = useState(PLAYS_PER_BLIND);
-  const [discardsLeft, setDiscardsLeft] = useState(DISCARDS_PER_BLIND);
+  const [bestWord, setBestWord] = useState<{ word: string; score: number } | null>(() => resume?.bestWord ?? null);
+  const [playsLeft, setPlaysLeft] = useState(() => resume?.playsLeft ?? PLAYS_PER_BLIND);
+  const [discardsLeft, setDiscardsLeft] = useState(() => resume?.discardsLeft ?? DISCARDS_PER_BLIND);
   const [path, setPath] = useState<number[]>([]);
-  const [found, setFound] = useState<Set<string>>(() => new Set());
+  const [found, setFound] = useState<Set<string>>(() => new Set(resume?.found ?? []));
   const [toast, setToast] = useState<Breakdown | null>(null);
   const [flash, setFlash] = useState<Set<string>>(() => new Set());
   const [fly, setFly] = useState<{ id: number; total: number } | null>(null);
-  const [shopStock, setShopStock] = useState<ShopRelic[]>([]);
-  const [charmStock, setCharmStock] = useState<ShopCharm[]>([]);
+  const [shopStock, setShopStock] = useState<ShopRelic[]>(() =>
+    resume
+      ? resume.shopStock
+          .map((e) => ({ card: relicsFromIds([e.cardId])[0], price: e.price }))
+          .filter((e): e is ShopRelic => !!e.card)
+      : [],
+  );
+  const [charmStock, setCharmStock] = useState<ShopCharm[]>(() =>
+    resume
+      ? resume.charmStock
+          .map((e) => ({ charm: charmsFromIds([e.charmId])[0], price: e.price }))
+          .filter((e): e is ShopCharm => !!e.charm)
+      : [],
+  );
   const [inspect, setInspect] = useState<Card | null>(null);
   const [achToast, setAchToast] = useState<string | null>(null);
   // Consumable charms: held in a few slots, tapped to fire, then spent.
-  const [charms, setCharms] = useState<Charm[]>(() => [STARTER_CHARM]);
-  const [doubleNext, setDoubleNext] = useState(false); // Spotlight: next word ×2
-  const [sealsCleared, setSealsCleared] = useState(false); // Locksmith: unseal this board
+  const [charms, setCharms] = useState<Charm[]>(() => (resume ? charmsFromIds(resume.charms) : [STARTER_CHARM]));
+  const [doubleNext, setDoubleNext] = useState(() => resume?.doubleNext ?? false); // Spotlight: next word ×2
+  const [sealsCleared, setSealsCleared] = useState(() => resume?.sealsCleared ?? false); // Locksmith: unseal this board
   const [charmToast, setCharmToast] = useState<string | null>(null);
-  const [overrides, setOverrides] = useState<Record<number, string>>({}); // Transmute tile→letter
+  const [overrides, setOverrides] = useState<Record<number, string>>(() => resume?.overrides ?? {}); // Transmute tile→letter
   const [transmute, setTransmute] = useState<{ charmIdx: number; target: number | null } | null>(null);
   // Per-run salt so boss blinds vary run-to-run (deterministic within a run).
-  const [runSalt] = useState(() => Date.now() >>> 0);
+  const [runSalt] = useState(() => resume?.runSalt ?? (Date.now() >>> 0));
 
   const tracing = useRef(false);
   const ending = useRef(false);
@@ -259,7 +285,7 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
 
   // Meta/achievements: count this Challenge run + flush play-time on unmount.
   useEffect(() => {
-    notifyAch(meta.recordRunStart());
+    if (!resume) notifyAch(meta.recordRunStart()); // resuming continues the SAME run
     const start = Date.now();
     return () => {
       meta.addTimePlayed((Date.now() - start) / 1000);
@@ -292,6 +318,38 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   useEffect(() => {
     if (boardMod) meta.markSeen([`mod:${boardMod.id}`]);
   }, [boardMod]);
+
+  // Persist the run at blind + shop boundaries so a closed tab can resume it.
+  // Keyed on the boundary-defining state (phase/step) plus shop-mutated state
+  // (deck/coins), so mid-play trace isn't saved — you resume at the blind start.
+  useEffect(() => {
+    if (phase !== "intro" && phase !== "play" && phase !== "shop") return;
+    saveRun({
+      mode: "challenge",
+      v: SNAP_VERSION,
+      phase,
+      step,
+      stake,
+      runSalt,
+      letters,
+      relics: relics.map((c) => c.id),
+      charms: charms.map((c) => c.id),
+      coins,
+      boardSeed,
+      boardScore,
+      playsLeft,
+      discardsLeft,
+      run: toRunSnap(run),
+      found: [...found],
+      bestWord,
+      overrides,
+      sealsCleared,
+      doubleNext,
+      shopStock: shopStock.map((e) => ({ cardId: e.card.id, price: e.price })),
+      charmStock: charmStock.map((e) => ({ charmId: e.charm.id, price: e.price })),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, step, relics, letters, coins]);
 
   // Opening draft → add the 5 chosen letters, then on to the relic pick.
   const confirmDraft = () => {
@@ -340,6 +398,7 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
     sound.levelClear();
     if (isWin(step + 1)) {
       meta.recordChallengeWin(stake); // 🏅 Challenger + unlocks the next stake
+      clearRun(); // run's over — no resume
       setPhase("won"); // cleared the final boss
       return;
     }
@@ -359,6 +418,7 @@ export function ChallengeScreen({ onExit }: { onExit: () => void }) {
   const fail = () => {
     if (ending.current) return;
     ending.current = true;
+    clearRun(); // run's over — no resume
     setPhase("lost");
     sound.timeUp();
   };

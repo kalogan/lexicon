@@ -20,6 +20,7 @@ import { loadDictionary } from "./dictionary.js";
 import { type Mode } from "./modes.js";
 import { sound } from "./sound.js";
 import * as store from "./store.js";
+import { loadRun, type RunSnapshot } from "./run/persist.js";
 
 type Phase = "ident" | "title" | "play" | "results" | "run" | "challenge" | "classic" | "codex";
 
@@ -32,6 +33,8 @@ export function App() {
   const [result, setResult] = useState<RoundResult | null>(null);
   const [best, setBest] = useState(0);
   const [isNewBest, setIsNewBest] = useState(false);
+  // A snapshot to resume into (set by the title's "Resume" option; cleared on a fresh run).
+  const [resumeSnap, setResumeSnap] = useState<RunSnapshot | null>(null);
 
   // Warm the (async, code-split) dictionary early so it's ready by first play,
   // and attempt to open the audio context now so the studio-ident chime can sound
@@ -67,9 +70,36 @@ export function App() {
   }
 
   if (phase === "title") {
+    const saved = loadRun();
+    const resumeOpt: MenuOption[] = saved
+      ? [
+          {
+            label: saved.mode === "challenge" ? "Resume Challenge" : "Resume Endless",
+            primary: true,
+            onSelect: () => {
+              setResumeSnap(saved);
+              setPhase(saved.mode === "endless" ? "run" : "challenge");
+            },
+          },
+        ]
+      : [];
     const options: MenuOption[] = [
-      { label: "Challenge", primary: true, onSelect: () => setPhase("challenge") },
-      { label: "Endless", onSelect: () => setPhase("run") },
+      ...resumeOpt,
+      {
+        label: "Challenge",
+        primary: !saved,
+        onSelect: () => {
+          setResumeSnap(null);
+          setPhase("challenge");
+        },
+      },
+      {
+        label: "Endless",
+        onSelect: () => {
+          setResumeSnap(null);
+          setPhase("run");
+        },
+      },
       { label: "Classic Mode", onSelect: () => setPhase("classic") },
       { label: "Codex", onSelect: () => setPhase("codex") },
     ];
@@ -87,11 +117,27 @@ export function App() {
   }
 
   if (phase === "run") {
-    return <RunScreen onExit={() => setPhase("title")} />;
+    return (
+      <RunScreen
+        resume={resumeSnap?.mode === "endless" ? resumeSnap : null}
+        onExit={() => {
+          setResumeSnap(null);
+          setPhase("title");
+        }}
+      />
+    );
   }
 
   if (phase === "challenge") {
-    return <ChallengeScreen onExit={() => setPhase("title")} />;
+    return (
+      <ChallengeScreen
+        resume={resumeSnap?.mode === "challenge" ? resumeSnap : null}
+        onExit={() => {
+          setResumeSnap(null);
+          setPhase("title");
+        }}
+      />
+    );
   }
 
   if (phase === "codex") {

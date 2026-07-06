@@ -11,6 +11,18 @@ import { readyDictionary, loadDictionary, type Dictionary } from "./dictionary.j
 import { scoreWord, makeRunState, type RunState, type Card, type Breakdown } from "./run/engine.js";
 import { STARTER_DECK, TUTORIAL_DECK, DRAFT_POOL } from "./run/cards.js";
 import { unlockedRelicIds } from "./run/unlocks.js";
+import {
+  saveRun,
+  clearRun,
+  toRunSnap,
+  fromRunSnap,
+  relicsFromIds,
+  charmsFromIds,
+  bossFromId,
+  modFromId,
+  SNAP_VERSION,
+  type EndlessSnapshot,
+} from "./run/persist.js";
 import { randomBoss, type Boss } from "./run/bosses.js";
 import { randomModifier, goldCell, type BoardMod } from "./run/modifiers.js";
 import { STARTER_CHARM, randomCharm, type Charm } from "./run/charms.js";
@@ -84,11 +96,11 @@ function pickN(src: readonly Card[], n = 3): Card[] {
 
 const PRICE: Record<Card["rarity"], number> = { common: 4, uncommon: 6, rare: 8, legendary: 12 };
 
-export function RunScreen({ onExit }: { onExit: () => void }) {
-  const firstRun = useRef(localStorage.getItem("lexicon:hasRun") !== "1");
+export function RunScreen({ onExit, resume }: { onExit: () => void; resume?: EndlessSnapshot | null }) {
+  const firstRun = useRef(!resume && localStorage.getItem("lexicon:hasRun") !== "1");
   useEffect(() => {
     localStorage.setItem("lexicon:hasRun", "1");
-    notifyAch(meta.recordRunStart());
+    if (!resume) notifyAch(meta.recordRunStart()); // resuming continues the SAME run — don't recount
     // Accumulate real play-time; flush it into the lifetime stat on unmount.
     const start = Date.now();
     return () => {
@@ -97,51 +109,55 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   }, []);
 
   const [dict, setDict] = useState<Dictionary | null>(() => readyDictionary());
-  const [deck, setDeck] = useState<Card[]>(() => [...(firstRun.current ? TUTORIAL_DECK : STARTER_DECK)]);
-  const [run, setRun] = useState<RunState>(() => makeRunState());
-  const [boardIdx, setBoardIdx] = useState(1);
-  const [boardSeed, setBoardSeed] = useState(() => Date.now());
+  const [deck, setDeck] = useState<Card[]>(() =>
+    resume ? relicsFromIds(resume.deck) : [...(firstRun.current ? TUTORIAL_DECK : STARTER_DECK)],
+  );
+  const [run, setRun] = useState<RunState>(() => (resume ? fromRunSnap(resume.run) : makeRunState()));
+  const [boardIdx, setBoardIdx] = useState(() => resume?.boardIdx ?? 1);
+  const [boardSeed, setBoardSeed] = useState(() => resume?.boardSeed ?? Date.now());
   const board: Board = useMemo(() => makeBoard(boardSeed, SIZE), [boardSeed]);
   // Board modifier — a per-board twist on regular boards (a boss takes the slot
   // instead). The first-ever (tutorial) board stays plain so the snowball reads clean.
   const [boardMod, setBoardMod] = useState<BoardMod | null>(() =>
-    firstRun.current ? null : randomModifier(boardSeed),
+    resume ? modFromId(resume.boardModId) : firstRun.current ? null : randomModifier(boardSeed),
   );
-  const [boardScore, setBoardScore] = useState(0);
-  const [runScore, setRunScore] = useState(0);
+  const [boardScore, setBoardScore] = useState(() => resume?.boardScore ?? 0);
+  const [runScore, setRunScore] = useState(() => resume?.runScore ?? 0);
   // Best single word this run (for the post-run recap).
-  const [bestWord, setBestWord] = useState<{ word: string; score: number } | null>(null);
-  const [timeLeft, setTimeLeft] = useState(() => TIME_BUDGET + (boardMod?.startTimeBonus ?? 0));
+  const [bestWord, setBestWord] = useState<{ word: string; score: number } | null>(() => resume?.bestWord ?? null);
+  const [timeLeft, setTimeLeft] = useState(() => resume?.timeLeft ?? TIME_BUDGET + (boardMod?.startTimeBonus ?? 0));
   // Hands: word-plays left this board (the primary limiter) + board reshuffles.
-  const [playsLeft, setPlaysLeft] = useState(PLAYS_PER_BOARD);
-  const [discardsLeft, setDiscardsLeft] = useState(RESHUFFLES_PER_RUN);
+  const [playsLeft, setPlaysLeft] = useState(() => resume?.playsLeft ?? PLAYS_PER_BOARD);
+  const [discardsLeft, setDiscardsLeft] = useState(() => resume?.discardsLeft ?? RESHUFFLES_PER_RUN);
   const [path, setPath] = useState<number[]>([]);
-  const [found, setFound] = useState<Set<string>>(() => new Set());
+  const [found, setFound] = useState<Set<string>>(() => new Set(resume?.found ?? []));
   // A real run opens with a 3-way choice; the first-ever run skips it (tutorial deck).
   const [phase, setPhase] = useState<"opening" | "play" | "draft" | "shop" | "dead">(() =>
-    firstRun.current ? "play" : "opening",
+    resume ? resume.phase : firstRun.current ? "play" : "opening",
   );
   // Relic pool for this run — legendaries gate in via lifetime unlocks.
   const [pool] = useState<readonly Card[]>(() => {
     const ids = unlockedRelicIds(meta.getStats());
     return DRAFT_POOL.filter((c) => ids.has(c.id));
   });
-  const [draft, setDraft] = useState<Card[]>(() => (firstRun.current ? [] : pickN(pool)));
-  const [coins, setCoins] = useState(0);
-  const [shopStock, setShopStock] = useState<Card[]>([]);
+  const [draft, setDraft] = useState<Card[]>(() =>
+    resume ? relicsFromIds(resume.draft) : firstRun.current ? [] : pickN(pool),
+  );
+  const [coins, setCoins] = useState(() => resume?.coins ?? 0);
+  const [shopStock, setShopStock] = useState<Card[]>(() => (resume ? relicsFromIds(resume.shopStock) : []));
   const [toast, setToast] = useState<Breakdown | null>(null);
   // Relic names that lit up on the last word (for the trigger-glow) + a score-fly.
   const [flash, setFlash] = useState<Set<string>>(() => new Set());
   const [fly, setFly] = useState<{ id: number; total: number } | null>(null);
-  const [boss, setBoss] = useState<Boss | null>(null);
+  const [boss, setBoss] = useState<Boss | null>(() => (resume ? bossFromId(resume.bossId) : null));
   // Consumable charms: held in a few slots, tapped to fire, then used up.
-  const [charms, setCharms] = useState<Charm[]>(() => [STARTER_CHARM]);
-  const [doubleNext, setDoubleNext] = useState(false); // Spotlight charm: next word ×2
-  const [sealsCleared, setSealsCleared] = useState(false); // Locksmith charm: unseal this board
+  const [charms, setCharms] = useState<Charm[]>(() => (resume ? charmsFromIds(resume.charms) : [STARTER_CHARM]));
+  const [doubleNext, setDoubleNext] = useState(() => resume?.doubleNext ?? false); // Spotlight charm: next word ×2
+  const [sealsCleared, setSealsCleared] = useState(() => resume?.sealsCleared ?? false); // Locksmith charm: unseal this board
   const [charmToast, setCharmToast] = useState<string | null>(null);
   // Transmute charm: per-tile letter overrides ({cellIndex: newLetter}) + the
   // interactive "tap a tile, then pick a letter" flow it opens.
-  const [overrides, setOverrides] = useState<Record<number, string>>({});
+  const [overrides, setOverrides] = useState<Record<number, string>>(() => resume?.overrides ?? {});
   const [transmute, setTransmute] = useState<{ charmIdx: number; target: number | null } | null>(null);
   const blocked = useMemo(
     () => new Set(sealsCleared ? [] : boss?.blocked?.(SIZE, boardSeed) ?? []),
@@ -222,6 +238,39 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   useEffect(() => {
     if (boardMod) meta.markSeen([`mod:${boardMod.id}`]);
   }, [boardMod]);
+
+  // Persist the run at board + draft/shop boundaries so a closed tab can resume it.
+  // Keyed on board/phase (+ shop-mutated deck/coins); mid-board trace isn't saved —
+  // you resume at the start of the board you were on.
+  useEffect(() => {
+    if (phase !== "play" && phase !== "draft" && phase !== "shop") return;
+    saveRun({
+      mode: "endless",
+      v: SNAP_VERSION,
+      phase,
+      boardIdx,
+      boardSeed,
+      coins,
+      runScore,
+      boardScore,
+      timeLeft,
+      playsLeft,
+      discardsLeft,
+      deck: deck.map((c) => c.id),
+      charms: charms.map((c) => c.id),
+      run: toRunSnap(run),
+      found: [...found],
+      bestWord,
+      bossId: boss?.id ?? null,
+      boardModId: boardMod?.id ?? null,
+      overrides,
+      sealsCleared,
+      doubleNext,
+      draft: draft.map((c) => c.id),
+      shopStock: shopStock.map((c) => c.id),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, boardIdx, deck, coins]);
 
   useEffect(() => {
     if (!dict) loadDictionary().then(setDict);
@@ -435,6 +484,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     }
     // Persist depth + score + any end-of-run achievements.
     meta.recordRunEnd(boardIdx, runScore);
+    clearRun(); // run's over — no resume
     setPhase("dead");
     sound.timeUp();
   };
