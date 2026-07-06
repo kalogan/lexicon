@@ -9,7 +9,7 @@ import { CHARMS, STARTER_CHARM, randomCharm, type CharmEffect } from "./charms.j
 import type { Rarity } from "./engine.js";
 
 const EFFECT_KINDS: CharmEffect["kind"][] = [
-  "time",
+  "plays",
   "reroll",
   "doubleNext",
   "clearSeals",
@@ -43,8 +43,8 @@ describe("STARTER_CHARM", () => {
     expect(CHARMS).toContain(STARTER_CHARM);
   });
 
-  it("is a time charm", () => {
-    expect(STARTER_CHARM.effect.kind).toBe("time");
+  it("grants an extra play", () => {
+    expect(STARTER_CHARM.effect.kind).toBe("plays");
   });
 });
 
@@ -63,9 +63,9 @@ describe("CHARMS data integrity", () => {
     }
   });
 
-  it("has positive seconds/amount on every time/permaMult effect", () => {
+  it("has positive count/amount on every plays/permaMult effect", () => {
     for (const c of CHARMS) {
-      if (c.effect.kind === "time") expect(c.effect.seconds).toBeGreaterThan(0);
+      if (c.effect.kind === "plays") expect(c.effect.count).toBeGreaterThan(0);
       if (c.effect.kind === "permaMult") expect(c.effect.amount).toBeGreaterThan(0);
     }
   });

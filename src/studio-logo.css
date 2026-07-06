@@ -67,9 +67,10 @@
   stroke-dashoffset: 210;
   animation: studioTongue 2.9s ease forwards;
 }
+/* Flick lands near the end of the content beat — ~1s after the eyes open — then
+   holds (forwards). The extended ident duration lets it linger, locked. */
 @keyframes studioTongue {
-  0%, 72% { stroke-dashoffset: 210; }
-  86% { stroke-dashoffset: 0; }
+  0%, 86% { stroke-dashoffset: 210; }
   100% { stroke-dashoffset: 0; }
 }
 .studio-tongue-tip {
@@ -80,9 +81,20 @@
   animation: studioTongueTip 2.9s ease forwards;
 }
 @keyframes studioTongueTip {
-  0%, 84% { opacity: 0; transform: scale(0.3); }
-  91% { opacity: 1; transform: scale(1.2); }
+  0%, 95% { opacity: 0; transform: scale(0.3); }
   100% { opacity: 1; transform: scale(1); }
+}
+
+/* The right eye squints just as the tongue flicks. */
+.studio-eye-right {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: studioSquint 2.9s ease forwards;
+}
+@keyframes studioSquint {
+  0%, 80% { transform: scaleY(1); }
+  90% { transform: scaleY(0.28); }
+  100% { transform: scaleY(0.32); }
 }
 
 /* Reduced motion: drop the draw-on + scale, keep gentle fades. */
@@ -103,6 +115,7 @@
     transform: none;
     animation: studioFadeInLate 2.9s ease forwards;
   }
+  .studio-eye-right { transform: none; animation: none; }
 }
 @keyframes studioFadeInLate {
   0%, 68% { opacity: 0; }

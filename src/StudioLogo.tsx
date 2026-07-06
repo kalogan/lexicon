@@ -41,19 +41,22 @@ function WovenwildArt() {
         <ellipse cx={200} cy={168} rx={62} ry={54} className="studio-body" />
         <circle cx={170} cy={132} r={30} className="studio-body" />
         <circle cx={232} cy={138} r={26} className="studio-body" />
-        {/* Frog eyes: pale eyeballs sitting on the bulges, with dark pupils that
-            open (fade in) on the beat the chime plays. */}
+        {/* Frog eyes: pale eyeballs on the bulges with dark pupils that open on
+            the chime beat. The RIGHT eye squints as the tongue flicks. */}
         <circle cx={173} cy={131} r={15} className="studio-eyeball" />
-        <circle cx={229} cy={136} r={13} className="studio-eyeball" />
         <circle cx={177} cy={133} r={6.5} className="studio-pupil" />
-        <circle cx={226} cy={138} r={6} className="studio-pupil" />
         <circle cx={179.5} cy={130.5} r={2.4} className="studio-glint" />
-        <circle cx={228.5} cy={135.5} r={2} className="studio-glint" />
+        <g className="studio-eye-right">
+          <circle cx={229} cy={136} r={13} className="studio-eyeball" />
+          <circle cx={226} cy={138} r={6} className="studio-pupil" />
+          <circle cx={228.5} cy={135.5} r={2} className="studio-glint" />
+        </g>
       </g>
-      {/* Tongue: flicks out just after the eyes open and locks with a sticky tip. */}
+      {/* Tongue: ~1s after the eyes, it flicks up and to the right — landing
+          above-right of the right eye — and locks with a sticky tip. */}
       <g className="studio-tongue">
-        <path className="studio-tongue-body" d="M200,200 Q268,236 332,252" />
-        <circle className="studio-tongue-tip" cx={332} cy={252} r={9} />
+        <path className="studio-tongue-body" d="M216,182 Q258,150 288,100" />
+        <circle className="studio-tongue-tip" cx={288} cy={100} r={8} />
       </g>
     </svg>
   );
@@ -61,7 +64,13 @@ function WovenwildArt() {
 
 export function StudioLogo({ onDone }: { onDone: () => void }) {
   return (
-    <StudioIdent wordmark="WOVENWILD" tagline="games" onDone={onDone} onCue={() => sound.chime()}>
+    <StudioIdent
+      wordmark="WOVENWILD"
+      tagline="games"
+      onDone={onDone}
+      onCue={() => sound.chime()}
+      timing={{ durationMs: 4500, cueMs: 1900 }}
+    >
       <WovenwildArt />
     </StudioIdent>
   );

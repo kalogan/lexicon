@@ -63,10 +63,11 @@ function commit(run: RunState, b: Breakdown, deck: readonly Card[]): RunState {
   };
 }
 
-function pickN(deck: readonly Card[], n = 3): Card[] {
-  const owned = new Set(deck.map((c) => c.id));
-  const pool = DRAFT_POOL.filter((c) => !owned.has(c.id));
-  const src = pool.length >= n ? pool : [...pool, ...DRAFT_POOL]; // fall back to dupes late
+function pickN(n = 3): Card[] {
+  // Draw from the FULL pool every time — relics can repeat across drafts, so you
+  // can STACK copies of the same relic (each copy fires). Still distinct within a
+  // single offering (no "choose between 3 identical").
+  const src = DRAFT_POOL;
   const out: Card[] = [];
   const used = new Set<number>();
   while (out.length < n && used.size < src.length) {
@@ -109,7 +110,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const [phase, setPhase] = useState<"opening" | "play" | "draft" | "shop" | "dead">(() =>
     firstRun.current ? "play" : "opening",
   );
-  const [draft, setDraft] = useState<Card[]>(() => (firstRun.current ? [] : pickN(STARTER_DECK)));
+  const [draft, setDraft] = useState<Card[]>(() => (firstRun.current ? [] : pickN()));
   const [coins, setCoins] = useState(0);
   const [shopStock, setShopStock] = useState<Card[]>([]);
   const [toast, setToast] = useState<Breakdown | null>(null);
@@ -295,8 +296,8 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
       return;
     }
     switch (e.kind) {
-      case "time":
-        setTimeLeft((t) => t + e.seconds);
+      case "plays":
+        setPlaysLeft((p) => p + e.count);
         break;
       case "reroll":
         setBoardSeed(Date.now()); // new letters (target/time/score carry over)
@@ -392,7 +393,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
       window.setTimeout(() => setCharmToast((m) => (m === msg ? null : m)), 1800);
     }
     setBoss(null);
-    setDraft(pickN(deck));
+    setDraft(pickN());
     setPhase("draft");
   };
 
@@ -401,7 +402,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
     const next = [...deck, card];
     setDeck(next);
     if (boardIdx % 3 === 0) {
-      setShopStock(pickN(next, 4));
+      setShopStock(pickN(4));
       setPhase("shop");
     } else {
       advanceBoard();
@@ -420,7 +421,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
   const reroll = () => {
     if (coins < 2) return;
     setCoins((c) => c - 2);
-    setShopStock(pickN(deck, 4));
+    setShopStock(pickN(4));
     sound.tap();
   };
 

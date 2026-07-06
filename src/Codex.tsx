@@ -40,8 +40,8 @@ function modIcon(mod: BoardMod): string {
 /** A tasteful emoji per charm effect kind — one glyph for what the one-shot does. */
 function charmIcon(charm: Charm): string {
   switch (charm.effect.kind) {
-    case "time":
-      return "⏳";
+    case "plays":
+      return "➕";
     case "reroll":
       return "🎲";
     case "doubleNext":

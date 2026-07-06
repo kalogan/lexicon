@@ -11,7 +11,7 @@ import type { Rarity } from "./engine.js";
 
 /** What a charm DOES when consumed. RunScreen interprets these — data only here. */
 export type CharmEffect =
-  | { kind: "time"; seconds: number }        // grant +N seconds now
+  | { kind: "plays"; count: number }         // grant +N extra word-plays this board
   | { kind: "reroll" }                       // re-roll the board's letters
   | { kind: "doubleNext" }                   // the next scored word counts ×2
   | { kind: "clearSeals" }                   // remove all sealed tiles this board (anti-boss)
@@ -27,24 +27,26 @@ export interface Charm {
   effect: CharmEffect;
 }
 
-/** The charm every run starts holding (so players meet the mechanic immediately). A "time" charm. */
+/** The charm every run starts holding (so players meet the mechanic immediately).
+ *  Plays are the scarce resource now (time is a relaxed safety net), so the
+ *  starter grants an extra play — a real tempo decision. */
 export const STARTER_CHARM: Charm = {
-  id: "charm-hourglass",
-  name: "Hourglass",
-  blurb: "Restore 25 seconds.",
+  id: "charm-extra-play",
+  name: "Extra Play",
+  blurb: "Play one more word this board.",
   rarity: "common",
-  effect: { kind: "time", seconds: 25 },
+  effect: { kind: "plays", count: 1 },
 };
 
 /** All charms, for drops + the Codex. STARTER_CHARM is a member (same object). */
 export const CHARMS: readonly Charm[] = [
   STARTER_CHARM,
   {
-    id: "charm-stopwatch",
-    name: "Stopwatch",
-    blurb: "Restore 45 seconds.",
+    id: "charm-overtime",
+    name: "Overtime",
+    blurb: "Two more plays this board.",
     rarity: "uncommon",
-    effect: { kind: "time", seconds: 45 },
+    effect: { kind: "plays", count: 2 },
   },
   {
     id: "charm-fresh-board",
