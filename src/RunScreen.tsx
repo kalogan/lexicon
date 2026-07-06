@@ -453,7 +453,7 @@ export function RunScreen({ onExit }: { onExit: () => void }) {
         )}
       </div>
 
-      <div className="board-wrap" style={{ width: "min(92vw, 420px)" }}>
+      <div className="board-wrap" style={{ width: "min(92vw, 420px, calc(100svh - 400px))" }}>
         <div
           className="board"
           style={{ gridTemplateColumns: `repeat(${SIZE}, 1fr)` }}

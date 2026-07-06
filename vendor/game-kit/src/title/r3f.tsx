@@ -414,7 +414,7 @@ export function TitleScreen({
             position: 'relative',
             zIndex: 1,
             textAlign: 'center',
-            marginTop: 'calc(9vh + env(safe-area-inset-top, 0px))',
+            marginTop: 'calc(4vh + env(safe-area-inset-top, 0px))',
             padding: 16,
           }}
         >

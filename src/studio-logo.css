@@ -1,0 +1,77 @@
+/* WOVENWILD studio ident — SVG threads weave into a goober (the studio mark).
+   Ported from CHIMERA so the WOVENWILD intro is consistent across games. Only
+   the ART lives here; the kit <StudioIdent> owns the wrap / wordmark / tagline /
+   skip / timing. All CSS keyframes so it runs even in a backgrounded tab. */
+
+.studio-art {
+  width: min(78vw, 460px);
+  height: auto;
+  max-height: 58vh;
+  display: block;
+}
+
+/* Threads: draw on (stroke-dashoffset), then fade back as the goober forms. */
+.studio-thread {
+  fill: none;
+  stroke: #c9762e;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  opacity: 0;
+  animation: studioThread 2.9s ease forwards;
+}
+@keyframes studioThread {
+  0% { stroke-dashoffset: 100; opacity: 0; }
+  8% { opacity: 0.85; }
+  42% { stroke-dashoffset: 0; opacity: 0.85; }
+  64% { stroke-dashoffset: 0; opacity: 0.22; }
+  100% { stroke-dashoffset: 0; opacity: 0.12; }
+}
+
+/* Goober: scales/fades in as the threads gather. */
+.studio-goober {
+  transform-box: fill-box;
+  transform-origin: 200px 158px;
+  opacity: 0;
+  animation: studioGoober 2.9s ease forwards;
+}
+@keyframes studioGoober {
+  0% { opacity: 0; transform: scale(0.35); }
+  32% { opacity: 0; transform: scale(0.5); }
+  52% { opacity: 1; transform: scale(1.05); }
+  60% { transform: scale(1); }
+  88% { opacity: 1; }
+  100% { opacity: 1; transform: scale(1); }
+}
+.studio-body { fill: #6fb98f; stroke: #4e9a70; stroke-width: 2; }
+.studio-eye { fill: #1a1420; opacity: 0; animation: studioEye 2.9s ease forwards; }
+.studio-glint { fill: #fff; opacity: 0; animation: studioEye 2.9s ease forwards; }
+@keyframes studioEye {
+  0% { opacity: 0; }
+  60% { opacity: 0; }
+  70% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+/* Reduced motion: drop the draw-on + scale, keep gentle fades. */
+@media (prefers-reduced-motion: reduce) {
+  .studio-thread {
+    stroke-dashoffset: 0;
+    animation: studioThreadReduced 2.4s ease forwards;
+  }
+  .studio-goober {
+    transform: none;
+    animation: studioGooberReduced 2.4s ease forwards;
+  }
+}
+@keyframes studioThreadReduced {
+  0% { opacity: 0; }
+  20% { opacity: 0.2; }
+  100% { opacity: 0.12; }
+}
+@keyframes studioGooberReduced {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 1; }
+}

@@ -5,7 +5,8 @@
  * difficulty keeps its own best score (kit `settings`).
  */
 import { useEffect, useState } from "react";
-import { StudioIdent, TitleScreen } from "game-kit/title/r3f";
+import { TitleScreen } from "game-kit/title/r3f";
+import { StudioLogo } from "./StudioLogo.js";
 import type { MenuOption } from "game-kit/title";
 import { PlayScreen, type RoundResult } from "./PlayScreen.js";
 import { ResultsScreen } from "./ResultsScreen.js";
@@ -57,7 +58,7 @@ export function App() {
   };
 
   if (phase === "ident") {
-    return <StudioIdent wordmark="WOVENWILD" tagline="games" onDone={() => setPhase("title")} />;
+    return <StudioLogo onDone={() => setPhase("title")} />;
   }
 
   if (phase === "title") {
